@@ -160,6 +160,16 @@ export function openAssetBuilder(editor: Editor): void {
     const v = parseFloat(colliderInput.value || '0');
     def.collider = v > 0 ? v : null;
   });
+  const boxWInput = el('input', { type: 'number', value: 0, min: 0, step: 0.1 }) as HTMLInputElement;
+  const boxDInput = el('input', { type: 'number', value: 0, min: 0, step: 0.1 }) as HTMLInputElement;
+  const syncBox = (): void => {
+    const w = parseFloat(boxWInput.value || '0');
+    const d = parseFloat(boxDInput.value || '0');
+    def.box = w > 0 && d > 0 ? { hw: w / 2, hd: d / 2 } : null;
+  };
+  boxWInput.addEventListener('input', syncBox);
+  boxDInput.addEventListener('input', syncBox);
+  const boxRow = el('div', { class: 'vec3' }, [boxWInput, boxDInput]);
 
   const loadExisting = (id: string): void => {
     const existing = editor.state.customAssets.find((d) => d.id === id);
@@ -167,6 +177,8 @@ export function openAssetBuilder(editor: Editor): void {
       def = clone(existing);
       nameInput.value = def.name;
       colliderInput.value = String(def.collider ?? 0);
+      boxWInput.value = String(def.box ? def.box.hw * 2 : 0);
+      boxDInput.value = String(def.box ? def.box.hd * 2 : 0);
       catSel.value = def.category;
     }
     refresh();
@@ -186,6 +198,7 @@ export function openAssetBuilder(editor: Editor): void {
     row('Name', nameInput),
     row('Category', catSel),
     row('Collider radius (0 = none)', colliderInput),
+    row('Solid box W × D (0 = none)', boxRow),
     el('div', { class: 'parts-head' }, [el('h3', { text: 'Parts' }), button('+ Add part', () => { def.parts.push(newPart()); refresh(); })]),
     partsWrap,
   ]);

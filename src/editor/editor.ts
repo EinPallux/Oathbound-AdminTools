@@ -320,6 +320,7 @@ export class Editor {
     if (ref.type === 'spawn') this.removeIndex(s.spawns, ref.index, 'Delete spawn', after);
     else if (ref.type === 'boss') this.removeIndex(s.bosses, ref.index, 'Delete boss', after);
     else if (ref.type === 'oathstone') this.removeIndex(s.oathstones, ref.index, 'Delete Oathstone', after);
+    else if (ref.type === 'npc') this.removeIndex(s.npcs, ref.index, 'Delete NPC', after);
     else if (ref.type === 'village') {
       const had = s.village;
       if (!had) return;
@@ -350,6 +351,36 @@ export class Editor {
     this.markAllDirty();
     this.onStateChange?.();
     this.setStatus(`New map “${name}” (${size}m, ${res}²)`);
+  }
+
+  /**
+   * Resize the world extent and/or grid resolution, resampling the existing terrain +
+   * biome into the new grid at the same world coordinates. All placed content keeps its
+   * world position (content outside a shrunk extent is kept but sits beyond the edge).
+   */
+  resizeMap(size: number, res: number): void {
+    const old = this.terrain;
+    const next = new EditorTerrain(size, res);
+    const half = size / 2;
+    const cell = size / (res - 1);
+    for (let z = 0; z < res; z++) {
+      for (let x = 0; x < res; x++) {
+        const wx = -half + x * cell;
+        const wz = -half + z * cell;
+        const idx = z * res + x;
+        next.heights[idx] = old.heightAt(wx, wz); // bilinear, clamps to the old edges
+        next.biomes[idx] = old.biomeAt(wx, wz);
+      }
+    }
+    next.refresh();
+    this.swapTerrain(next);
+    this.state.size = size;
+    this.state.res = res;
+    this.history.clear(); // a resample isn't cheaply invertible
+    this.addWorldBounds();
+    this.markAllDirty();
+    this.onStateChange?.();
+    this.setStatus(`Resized to ${size}m · ${res}² (content preserved)`);
   }
 
   /** Load decoded terrain + state (from an imported/loaded map). */

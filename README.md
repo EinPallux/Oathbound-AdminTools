@@ -33,12 +33,15 @@ A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terra
 | **Biome** | Paint biome regions (Greenmarch, Thornwood, Fen, Ember, Riven, Gravereach, Hub). Recolours the ground and tells the game what vegetation to auto-scatter there. |
 | **Lake** | Press-drag to place a circular water body. Sculpt a basin first for depth. |
 | **River / Road** | Click to drop polyline points, double-click or Enter to finish. Draped over the terrain. |
-| **Assets** | Place props (single or scattered) from the library — every built-in Oathbound prop plus your custom assets. |
+| **Assets** | Place props (single or scattered) from the library — every built-in Oathbound prop, a **pre-made set** of buildings / walls / towers / town props / ruins / extra trees & nature, plus your own custom assets. |
 | **Erase** | Drag to remove placed props within the brush. |
 | **Markers** | Place enemy spawns, world bosses, Oathstone travel points, the player spawn and the town. |
-| **Select** | Click an asset/marker to inspect, tweak, or delete it. |
+| **NPCs** | Place friendly NPCs (villager / guard / merchant / elder) and click out a looped patrol route — or leave them idle. They walk it in-game. |
+| **Select** | Click an asset/marker/NPC to inspect, tweak, or delete it. |
 
-**Asset Builder**: compose new low-poly props from primitives (box / cylinder / cone / sphere / icosahedron), each with a colour + transform, with a live spinning preview. Saved assets join the library and export with the map.
+**Resize** (top bar): change the world extent and/or grid resolution any time — the terrain & biomes are resampled and **all placed content keeps its position**.
+
+**Asset Builder**: compose new low-poly props from primitives (box / cylinder / cone / sphere / icosahedron), each with a colour + transform, with a live spinning preview. Give it a round or box collider to make it solid. Saved assets join the library and export with the map.
 
 **Camera**: right-drag orbit · wheel zoom · middle-drag pan. **Brush size**: `[` / `]`. **Undo/Redo**: Ctrl+Z / Ctrl+Y.
 

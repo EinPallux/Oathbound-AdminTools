@@ -7,6 +7,7 @@ import type { EditorTerrain } from './terrain';
 import type { AssetDef, PlacedAsset } from '../format/map';
 import { builtinGeometry, customAssetGeometry } from '../oathbound/geometry';
 import { builtinById, builtinYLift, parseBuiltin, type BuiltinKind } from '../format/assets-builtin';
+import { presetById } from '../format/presets';
 
 // Kinds that read better smooth-shaded (canopies, blooms) vs faceted low-poly.
 const SMOOTH_KINDS = new Set<BuiltinKind>(['tree', 'flower', 'lily']);
@@ -24,6 +25,9 @@ function geometryFor(assetId: string, customAssets: AssetDef[]): THREE.BufferGeo
   const builtin = parseBuiltin(assetId);
   if (builtin) {
     geo = builtinGeometry(builtin.kind, builtin.variant);
+  } else if (assetId.startsWith('preset:')) {
+    const def = presetById(assetId.slice('preset:'.length));
+    if (def) geo = customAssetGeometry(def);
   } else if (assetId.startsWith('custom:')) {
     const def = customAssets.find((d) => `custom:${d.id}` === assetId);
     if (def) geo = customAssetGeometry(def);

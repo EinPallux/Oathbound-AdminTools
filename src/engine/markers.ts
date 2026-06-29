@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { EditorTerrain } from './terrain';
 import type { EditorState } from '../editor/state';
 
-export type MarkerType = 'spawn' | 'boss' | 'oathstone' | 'player' | 'village';
+export type MarkerType = 'spawn' | 'boss' | 'oathstone' | 'player' | 'village' | 'npc';
 export interface MarkerRef {
   type: MarkerType;
   index: number;
@@ -55,6 +55,11 @@ function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number,
   c.arcTo(x, y, x + w, y, r);
   c.closePath();
 }
+
+/** NPC robe tints by variant (villager / guard / merchant / elder). */
+export const NPC_TINTS = [0x5b7da8, 0x8a8f99, 0x9c6b3f, 0x6a5a72];
+const SKIN_MAT = new THREE.MeshLambertMaterial({ color: 0xe0b48c });
+const ROUTE_MAT = new THREE.LineBasicMaterial({ color: 0x6fe0a0, transparent: true, opacity: 0.85, depthTest: false });
 
 const SPAWN_MAT = new THREE.MeshLambertMaterial({ color: 0xd64545 });
 const BOSS_MAT = new THREE.MeshLambertMaterial({ color: 0xb145d6 });
@@ -161,6 +166,37 @@ export class MarkerLayer {
       g.rotation.y = v.rot;
       this.add(g, { type: 'village', index: 0 });
     }
+
+    // Friendly NPCs: a small figure + name label, plus a route line if they patrol.
+    state.npcs.forEach((npc, i) => {
+      const g = new THREE.Group();
+      const robe = new THREE.MeshLambertMaterial({ color: NPC_TINTS[npc.variant ?? 0] ?? NPC_TINTS[0] });
+      const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.7, 6), robe);
+      legs.position.y = 0.35;
+      g.add(legs);
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.8, 7), robe);
+      torso.position.y = 1.0;
+      g.add(torso);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), SKIN_MAT);
+      head.position.y = 1.6;
+      g.add(head);
+      const label = labelSprite(`☺ ${npc.name}`, '#cdeedd');
+      label.position.y = 2.4;
+      g.add(label);
+      g.position.set(npc.x, terrain.heightAt(npc.x, npc.z), npc.z);
+      this.add(g, { type: 'npc', index: i });
+
+      if (npc.route.length) {
+        const pts = [{ x: npc.x, z: npc.z }, ...npc.route, { x: npc.x, z: npc.z }];
+        const arr: number[] = [];
+        for (const p of pts) arr.push(p.x, terrain.heightAt(p.x, p.z) + 0.4, p.z);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+        const line = new THREE.Line(geo, ROUTE_MAT);
+        line.renderOrder = 996;
+        this.group.add(line);
+      }
+    });
   }
 
   pick(raycaster: THREE.Raycaster): MarkerRef | null {

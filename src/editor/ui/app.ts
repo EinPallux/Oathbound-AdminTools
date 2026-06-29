@@ -53,6 +53,7 @@ export class EditorUI {
       this.undoBtn,
       this.redoBtn,
       button('New', () => this.openNewMap()),
+      button('Resize', () => this.openResize()),
       button('Save', () => this.doSave()),
       button('Load', () => this.openSaves()),
       button('Import', () => this.doImport()),
@@ -174,6 +175,31 @@ export class EditorUI {
       button('Cancel', () => closeModal()),
       button('Create', () => {
         this.editor.newMap(name || 'Untitled Map', Math.max(100, size), parseInt(res, 10));
+        closeModal();
+      }, 'primary'),
+    ]);
+  }
+
+  private openResize(): void {
+    let size = this.editor.state.size;
+    let res = String(this.editor.state.res);
+    const sizeI = el('input', { type: 'number', value: size, min: 100, max: 2000, step: 20 }) as HTMLInputElement;
+    sizeI.addEventListener('input', () => (size = parseInt(sizeI.value || '680', 10)));
+    const body = el('div', {}, [
+      row('World size (m)', sizeI),
+      select('Resolution', [
+        { value: '129', label: '129² — coarse, fast' },
+        { value: '193', label: '193² — medium' },
+        { value: '257', label: '257² — detailed' },
+        { value: '321', label: '321² — fine, heavier' },
+        { value: '385', label: '385² — very fine' },
+      ], res, (v) => (res = v)),
+      el('p', { class: 'hint', text: 'Resamples the terrain + biomes into the new grid. All placed content keeps its world position; content beyond a smaller extent is kept but sits past the edge. Undo history is cleared.' }),
+    ]);
+    modal('Resize Map', body, [
+      button('Cancel', () => closeModal()),
+      button('Resize', () => {
+        this.editor.resizeMap(Math.max(100, size), parseInt(res, 10));
         closeModal();
       }, 'primary'),
     ]);

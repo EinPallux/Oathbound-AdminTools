@@ -150,6 +150,14 @@ export class EditorTerrain {
     return a + (b - a) * tz;
   }
 
+  /** Nearest-cell biome index at world (x, z). */
+  biomeAt(x: number, z: number): number {
+    const { res, cell, half } = this;
+    const xi = clamp(Math.round((x + half) / cell), 0, res - 1);
+    const zi = clamp(Math.round((z + half) / cell), 0, res - 1);
+    return this.biomes[zi * res + xi];
+  }
+
   // ── Brush iteration ───────────────────────────────────────────────────────-
 
   /**

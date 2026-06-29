@@ -7,6 +7,7 @@ import type { Tool } from '../tool';
 import type { Editor } from '../editor';
 import type { AssetCategory, PlacedAsset } from '../../format/map';
 import { BUILTIN_ASSETS } from '../../format/assets-builtin';
+import { PRESET_ASSETS } from '../../format/presets';
 import { makePreviewMesh, previewYLift, defaultScaleFor } from '../../engine/asset-render';
 import { el, section, slider, checkbox } from '../ui/dom';
 
@@ -152,10 +153,12 @@ export const assetTool: Tool = new (class implements Tool {
       grid.append(b);
     };
     for (const cat of CATEGORY_ORDER) {
-      const items = BUILTIN_ASSETS.filter((a) => a.category === cat);
-      if (!items.length) continue;
+      const builtins = BUILTIN_ASSETS.filter((a) => a.category === cat);
+      const presets = PRESET_ASSETS.filter((a) => a.category === cat);
+      if (!builtins.length && !presets.length) continue;
       grid.append(el('div', { class: 'lib-cat', text: CATEGORY_LABELS[cat] }));
-      for (const a of items) addBtn(a.id, a.label);
+      for (const a of builtins) addBtn(a.id, a.label);
+      for (const a of presets) addBtn(`preset:${a.id}`, a.name);
     }
     if (editor.state.customAssets.length) {
       grid.append(el('div', { class: 'lib-cat', text: 'Custom Assets' }));

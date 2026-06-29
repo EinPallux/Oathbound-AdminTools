@@ -8,6 +8,7 @@ import { riverTool, roadTool } from './path';
 import { assetTool } from './asset-place';
 import { eraseTool } from './erase';
 import { markersTool } from './markers-tool';
+import { npcTool } from './npc-tool';
 import { selectTool } from './select';
 
 export const TOOLS: Tool[] = [
@@ -19,5 +20,6 @@ export const TOOLS: Tool[] = [
   assetTool,
   eraseTool,
   markersTool,
+  npcTool,
   selectTool,
 ];

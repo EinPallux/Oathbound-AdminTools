@@ -58,6 +58,7 @@ export const selectTool: Tool = new (class implements Tool {
     if (m.type === 'spawn') return s.spawns[m.index] ?? null;
     if (m.type === 'boss') return s.bosses[m.index] ?? null;
     if (m.type === 'oathstone') return s.oathstones[m.index] ?? null;
+    if (m.type === 'npc') return s.npcs[m.index] ?? null;
     if (m.type === 'player') return s.playerSpawn;
     if (m.type === 'village') return s.village;
     return null;
@@ -131,6 +132,22 @@ export const selectTool: Tool = new (class implements Tool {
       cb.addEventListener('change', () => { o.road = cb.checked; });
       roadWrap.append(cb, el('span', { text: 'Road from hub' }));
       wrap.append(el('p', { class: 'sel-title', text: `Oathstone · ${o.id}` }), row('Name', nameI), roadWrap, del);
+    } else if (m.type === 'npc') {
+      const npc = s.npcs[m.index];
+      if (!npc) return wrap;
+      const nameI = el('input', { type: 'text', value: npc.name }) as HTMLInputElement;
+      nameI.addEventListener('input', () => { npc.name = nameI.value; editor.markMarkersDirty(); });
+      wrap.append(
+        el('p', { class: 'sel-title', text: `NPC · ${npc.name}` }),
+        row('Name', nameI),
+        slider('Walk speed', { min: 0.4, max: 3, step: 0.1, value: npc.speed, onInput: (v) => { npc.speed = v; }, format: (v) => `${v.toFixed(1)} m/s` }).row,
+        selectRow('Look', [
+          { value: '0', label: 'Villager' }, { value: '1', label: 'Guard' },
+          { value: '2', label: 'Merchant' }, { value: '3', label: 'Elder' },
+        ], String(npc.variant ?? 0), (v) => { npc.variant = parseInt(v, 10); editor.markMarkersDirty(); }),
+        el('p', { class: 'hint', text: `${npc.route.length} patrol point(s). Re-add via the NPCs tool to change the route.` }),
+        del,
+      );
     } else if (m.type === 'player') {
       wrap.append(el('p', { class: 'sel-title', text: 'Player spawn' }), el('p', { class: 'hint', text: 'Use the Markers tool (Player spawn) to move it.' }));
     } else if (m.type === 'village') {

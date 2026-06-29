@@ -11,6 +11,7 @@ import {
   type MapBoss,
   type MapFlat,
   type MapLake,
+  type MapNpc,
   type MapOathstone,
   type MapPath,
   type MapSpawn,
@@ -33,6 +34,7 @@ export class EditorState {
   spawns: MapSpawn[] = [];
   bosses: MapBoss[] = [];
   oathstones: MapOathstone[] = [];
+  npcs: MapNpc[] = [];
   playerSpawn: { x: number; z: number } = { x: 0, z: 0 };
   flats: MapFlat[] = [];
   village: { x: number; z: number; rot: number } | null = null;
@@ -54,6 +56,7 @@ export class EditorState {
       spawns: this.spawns,
       bosses: this.bosses,
       oathstones: this.oathstones,
+      npcs: this.npcs,
       playerSpawn: this.playerSpawn,
       flats: this.flats,
       village: this.village,
@@ -75,6 +78,7 @@ export class EditorState {
     s.spawns = map.spawns;
     s.bosses = map.bosses;
     s.oathstones = map.oathstones;
+    s.npcs = map.npcs;
     s.playerSpawn = map.playerSpawn;
     s.flats = map.flats;
     s.village = map.village;
