@@ -1,0 +1,61 @@
+# Oathbound — Admin Tools
+
+A web-based **3D Map Builder** + **Asset Builder** for [Oathbound](https://github.com/einpallux/oathbound), the solo-friendly 3D browser MMORPG. Design maps visually (true to how they'll look in-game), then export an `oathbound-map.json` the game loads at startup.
+
+Built with **Vite + TypeScript + Three.js**. No backend — everything runs in the browser and deploys statically to **Vercel**.
+
+## Run locally
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # typecheck + production build → dist/
+npm run preview    # serve the production build
+```
+
+## Deploy to Vercel
+
+This repo is Vercel-ready (`vercel.json`). Import the repo in Vercel and accept the defaults:
+
+- **Framework preset:** Vite
+- **Build command:** `npm run build`
+- **Output directory:** `dist`
+
+## What it does
+
+A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terrain colours, so what you build is what you get in-game.
+
+**Tools** (left rail):
+
+| Tool | What it does |
+|------|--------------|
+| **Sculpt** | Raise / Lower / Smooth / Flatten / Set-height brushes on the terrain. |
+| **Biome** | Paint biome regions (Greenmarch, Thornwood, Fen, Ember, Riven, Gravereach, Hub). Recolours the ground and tells the game what vegetation to auto-scatter there. |
+| **Lake** | Press-drag to place a circular water body. Sculpt a basin first for depth. |
+| **River / Road** | Click to drop polyline points, double-click or Enter to finish. Draped over the terrain. |
+| **Assets** | Place props (single or scattered) from the library — every built-in Oathbound prop plus your custom assets. |
+| **Erase** | Drag to remove placed props within the brush. |
+| **Markers** | Place enemy spawns, world bosses, Oathstone travel points, the player spawn and the town. |
+| **Select** | Click an asset/marker to inspect, tweak, or delete it. |
+
+**Asset Builder**: compose new low-poly props from primitives (box / cylinder / cone / sphere / icosahedron), each with a colour + transform, with a live spinning preview. Saved assets join the library and export with the map.
+
+**Camera**: right-drag orbit · wheel zoom · middle-drag pan. **Brush size**: `[` / `]`. **Undo/Redo**: Ctrl+Z / Ctrl+Y.
+
+## Maps
+
+- **Save / Load** keep named maps in this browser's `localStorage`; the editor also autosaves your last session.
+- **Export JSON** downloads `<name>.oathbound-map.json`.
+- **Import** loads any exported map back in.
+
+### Loading a map into Oathbound
+
+1. **Export JSON** here.
+2. Drop the file into the game repo at `public/maps/<name>.oathbound-map.json`.
+3. Run the game with `?map=<name>` (e.g. `http://localhost:5173/?map=my-world`).
+
+The game has a non-destructive **map loader** (`src/world/map-format.ts` + `src/world/custom-map.ts`): when a map is requested it builds the world from your JSON instead of the procedural generators; with no `?map=` it boots the default procedural world exactly as before.
+
+## The map format
+
+A single versioned JSON object (`src/format/map.ts`, mirrored in the game repo). Coordinates match the game: XZ ground plane, Y up, world centred on the origin. Terrain is a row-major height grid (packed as base64 Int16 centimetres on export) plus a per-cell biome grid. See `src/format/map.ts` for the full schema.
