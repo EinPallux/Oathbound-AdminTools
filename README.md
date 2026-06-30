@@ -35,7 +35,7 @@ A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terra
 | **River / Road** | Click to drop polyline points, double-click or Enter to finish. Draped over the terrain. |
 | **Assets** | Place props (single or scattered) from the library — every built-in Oathbound prop, a **pre-made set** of buildings / walls / towers / town props / ruins / extra trees & nature, plus your own custom assets. Each shown as a **live 3D thumbnail**. |
 | **Erase** | Drag to remove placed props within the brush. |
-| **Markers** | Place enemy spawns, world bosses, Oathstone travel points, the player spawn and the town. |
+| **Markers** | Place enemy spawns, world bosses, Oathstone travel points, the player spawn and the town. The **player spawn shows the real player model at true 1:1 scale** — a size reference for how big to make/scale assets. |
 | **NPCs** | Place friendly NPCs (villager / guard / merchant / elder) and click out a looped patrol route — or leave them idle. They walk it in-game. |
 | **Select** | Click an asset/marker/NPC to inspect, tweak, or delete it. |
 

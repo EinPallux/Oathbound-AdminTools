@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import type { EditorTerrain } from './terrain';
 import type { EditorState } from '../editor/state';
+import { buildPlayerModel } from '../oathbound/player-model';
 
 export type MarkerType = 'spawn' | 'boss' | 'oathstone' | 'player' | 'village' | 'npc';
 export interface MarkerRef {
@@ -136,14 +137,13 @@ export class MarkerLayer {
     {
       const p = state.playerSpawn;
       const g = new THREE.Group();
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.4, 6), PLAYER_MAT);
-      pole.position.y = 1.7;
-      g.add(pole);
-      const flag = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 0.08), PLAYER_MAT);
-      flag.position.set(0.7, 3.0, 0);
-      g.add(flag);
-      const label = labelSprite('▶ Player Spawn', '#d2ffe0');
-      label.position.y = 4.4;
+      // The real player avatar at true 1:1 scale — a size reference for assets.
+      g.add(buildPlayerModel());
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 28).rotateX(-Math.PI / 2), PLAYER_MAT);
+      ring.position.y = 0.03;
+      g.add(ring);
+      const label = labelSprite('▶ Player Spawn · ~2.4m (1:1)', '#d2ffe0');
+      label.position.y = 3.0;
       g.add(label);
       g.position.set(p.x, terrain.heightAt(p.x, p.z), p.z);
       this.add(g, { type: 'player', index: 0 });
