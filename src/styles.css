@@ -42,6 +42,7 @@ button.btn, .tool-btn { font: inherit; cursor: pointer; }
 .btn.danger { color: #ffd6d2; border-color: #5a2b28; }
 .btn.danger:hover { background: #3a201e; }
 .btn.icon { padding: 6px 9px; min-width: 32px; }
+.btn.active { border-color: var(--accent); background: #1a2c44; box-shadow: 0 0 0 1px var(--accent) inset; }
 .btn:disabled { opacity: 0.4; cursor: default; }
 
 /* Left rail: toolbar + panel */

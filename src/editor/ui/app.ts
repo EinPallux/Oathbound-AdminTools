@@ -48,12 +48,22 @@ export class EditorUI {
     this.undoBtn.title = 'Undo (Ctrl+Z)';
     this.redoBtn.title = 'Redo (Ctrl+Y)';
 
+    // Distance-fog toggle (off by default so large maps stay fully visible).
+    const fogBtn = button('Fog: off', () => {
+      const on = !this.editor.viewport.fogEnabled;
+      this.editor.viewport.setFog(on);
+      fogBtn.textContent = on ? 'Fog: on' : 'Fog: off';
+      fogBtn.classList.toggle('active', on);
+    });
+    fogBtn.title = 'Toggle distance fog — turn on for an atmospheric look, off to see across giant maps';
+
     topbar.append(
       el('span', { class: 'brand', text: '⚒ Oathbound Map Builder' }),
       this.nameLabel,
       el('div', { class: 'spacer' }),
       this.undoBtn,
       this.redoBtn,
+      fogBtn,
       button('New', () => this.openNewMap()),
       button('Resize', () => this.openResize()),
       button('Heightmap', () => this.openHeightmap()),

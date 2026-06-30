@@ -51,6 +51,8 @@ A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terra
 
 **Camera**: **WASD/QE to fly** (Shift = sprint) · right-drag orbit · wheel zoom · middle-drag pan. **Brush size**: `[` / `]`. **Undo/Redo**: Ctrl+Z / Ctrl+Y. **Duplicate asset**: Ctrl+D. **Delete selected**: Del / Backspace.
 
+**Fog toggle** (top bar): distance fog is **off by default** so giant maps stay fully visible while you edit; flip it on for an atmospheric preview of how the world reads at range.
+
 ## Maps
 
 - **Save / Load** keep named maps in this browser's `localStorage`; the editor also autosaves your last session.

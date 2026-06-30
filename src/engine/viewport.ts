@@ -19,6 +19,7 @@ export class Viewport {
   private readonly fwd = new THREE.Vector3();
   private readonly right = new THREE.Vector3();
   private readonly move = new THREE.Vector3();
+  private readonly distanceFog = new THREE.Fog(0x9fc6e8, 360, 900);
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -27,7 +28,8 @@ export class Viewport {
     this.renderer.shadowMap.enabled = false;
 
     this.scene.background = new THREE.Color(0x9fc6e8);
-    this.scene.fog = new THREE.Fog(0x9fc6e8, 360, 900);
+    // Distance fog OFF by default so giant maps are fully visible; toggle it from the top bar.
+    this.scene.fog = null;
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.5, 4000);
     this.camera.position.set(120, 130, 200);
@@ -143,5 +145,13 @@ export class Viewport {
 
   enableControls(on: boolean): void {
     this.controls.enabled = on;
+  }
+
+  /** Toggle the atmospheric distance fog. Off = the whole map stays visible. */
+  setFog(on: boolean): void {
+    this.scene.fog = on ? this.distanceFog : null;
+  }
+  get fogEnabled(): boolean {
+    return this.scene.fog != null;
   }
 }
