@@ -96,7 +96,7 @@ export class EditorTerrain {
         const h = heights[idx];
         parr[idx * 3 + 1] = h;
 
-        colorForBiome(biomes[idx], h, c);
+        colorForBiome(biomes[idx], h, -this.half + x * this.cell, -this.half + z * this.cell, c);
         carr[idx * 3] = c.r;
         carr[idx * 3 + 1] = c.g;
         carr[idx * 3 + 2] = c.b;

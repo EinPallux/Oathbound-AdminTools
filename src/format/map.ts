@@ -21,6 +21,20 @@ export const BIOME_IDS = [
   'riven',
   'gravereach',
   'hub',
+  // ── extended ground surfaces (cosmetic; custom maps only) ──
+  'city',
+  'desert',
+  'mesa',
+  'savanna',
+  'tundra',
+  'dirt',
+  'sand',
+  'mud',
+  'cobblestone',
+  'ash',
+  'jungle',
+  'ice',
+  'basalt',
 ] as const;
 export type BiomeId = (typeof BIOME_IDS)[number];
 
