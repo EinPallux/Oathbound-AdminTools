@@ -2,6 +2,7 @@
 
 import type { Tool } from '../tool';
 import { sculptTool } from './sculpt';
+import { flattenTool } from './flatten';
 import { biomeTool } from './biome';
 import { lakeTool } from './lake';
 import { riverTool, roadTool } from './path';
@@ -14,6 +15,7 @@ import { selectTool } from './select';
 
 export const TOOLS: Tool[] = [
   sculptTool,
+  flattenTool,
   biomeTool,
   lakeTool,
   riverTool,
