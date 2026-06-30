@@ -35,7 +35,7 @@ A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terra
 | **Lake** | Press-drag to place a circular water body. Sculpt a basin first for depth. |
 | **River / Road** | Click to drop polyline points, double-click or Enter to finish. Draped over the terrain. |
 | **Assets** | Place props (single or scattered) from a 100-asset library — every built-in Oathbound prop, a **pre-made set** of buildings / walls / towers / bridges / town props / ruins / extra trees & nature, plus your own custom assets. Each shown as a **live 3D thumbnail**. A **Height offset** slider raises/lowers what you place (e.g. a bridge above a lake). |
-| **Erase** | Drag to remove placed props within the brush. |
+| **Erase** | Drag to remove things within the brush: **props, lakes, rivers and roads**. A whole lake / river / road is removed when the brush touches any part of it. Per-category toggles (Assets · Lakes, rivers & roads) let you protect a category; undo restores everything. |
 | **Markers** | Place enemy spawns, world bosses, Oathstone travel points and the player spawn. The **player spawn shows the real player model at true 1:1 scale** — a size reference for how big to make/scale assets. |
 | **NPCs** | Place friendly NPCs (villager / guard / merchant / elder) and click out a looped patrol route — or leave them idle. They walk it in-game; give them dialog + quests in the **Quests & Dialog** editor. |
 | **Critters** | Drop ambient-wildlife zones — **birds** (overhead), ground **critters** (rats/rabbits), **butterflies**, **fireflies** — with a radius + count. They wander/glow in-game. |
