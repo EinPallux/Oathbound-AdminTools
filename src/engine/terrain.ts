@@ -7,6 +7,9 @@ import * as THREE from 'three';
 import { clamp } from './math';
 import { colorForBiome } from '../oathbound/palette';
 
+/** Sculpt brush footprint + edge profile. Hard-edged shapes build vertical cliffs. */
+export type BrushShape = 'circle' | 'square' | 'pillar' | 'mesa';
+
 export class EditorTerrain {
   readonly size: number;
   readonly res: number;
@@ -163,6 +166,7 @@ export class EditorTerrain {
   /**
    * Visit every cell within `radius` of world (cx, cz). `fn` receives the cell index,
    * a smooth falloff in [0,1] (1 at centre → 0 at the rim) and the cell's world XZ.
+   * (Circular soft brush — kept for the smooth/flatten/biome tools.)
    */
   forEachCellInRadius(
     cx: number,
@@ -170,21 +174,48 @@ export class EditorTerrain {
     radius: number,
     fn: (idx: number, falloff: number, wx: number, wz: number) => void,
   ): void {
+    this.forEachCellInBrush(cx, cz, radius, 'circle', fn);
+  }
+
+  /**
+   * Generalised brush iteration over a footprint shape + edge profile:
+   *   - 'circle' : round footprint, smooth (domed) falloff — soft hills.
+   *   - 'square' : square footprint, smooth falloff — soft rectangular mounds.
+   *   - 'pillar' : round footprint, HARD edge (uniform strength) — vertical cylinders / round cliffs.
+   *   - 'mesa'   : square footprint, HARD edge (uniform strength) — flat-topped plateaus / rectangular cliffs.
+   * `fn` receives the cell index, a weight in [0,1], and the cell's world XZ.
+   */
+  forEachCellInBrush(
+    cx: number,
+    cz: number,
+    radius: number,
+    shape: BrushShape,
+    fn: (idx: number, falloff: number, wx: number, wz: number) => void,
+  ): void {
     const { res, cell, half } = this;
     const minX = clamp(Math.floor((cx - radius + half) / cell), 0, res - 1);
     const maxX = clamp(Math.ceil((cx + radius + half) / cell), 0, res - 1);
     const minZ = clamp(Math.floor((cz - radius + half) / cell), 0, res - 1);
     const maxZ = clamp(Math.ceil((cz + radius + half) / cell), 0, res - 1);
-    const r2 = radius * radius;
+    const squareFoot = shape === 'square' || shape === 'mesa';
+    const hardEdge = shape === 'pillar' || shape === 'mesa';
     for (let z = minZ; z <= maxZ; z++) {
       for (let x = minX; x <= maxX; x++) {
         const wx = -half + x * cell;
         const wz = -half + z * cell;
-        const d2 = (wx - cx) * (wx - cx) + (wz - cz) * (wz - cz);
-        if (d2 > r2) continue;
-        const d = Math.sqrt(d2);
-        const falloff = radius <= 0 ? 1 : 1 - d / radius;
-        fn(z * res + x, falloff * falloff * (3 - 2 * falloff), wx, wz);
+        const dx = wx - cx;
+        const dz = wz - cz;
+        // Normalised distance to the rim: Chebyshev for squares, Euclidean for rounds.
+        const dist = squareFoot ? Math.max(Math.abs(dx), Math.abs(dz)) : Math.hypot(dx, dz);
+        if (dist > radius) continue;
+        let falloff: number;
+        if (hardEdge) {
+          falloff = 1; // uniform to the rim → vertical sides (cliffs / pillars / mesas)
+        } else {
+          const f = radius <= 0 ? 1 : 1 - dist / radius;
+          falloff = f * f * (3 - 2 * f); // smoothstep → domed
+        }
+        fn(z * res + x, falloff, wx, wz);
       }
     }
   }

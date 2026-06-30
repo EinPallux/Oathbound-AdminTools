@@ -3,6 +3,7 @@
 
 import type { Tool } from '../tool';
 import type { Editor } from '../editor';
+import type { BrushShape } from '../../engine/terrain';
 import { GridStroke } from '../history';
 import { clamp } from '../../engine/math';
 import { el, section, slider, select } from '../ui/dom';
@@ -17,6 +18,7 @@ export const sculptTool: Tool = new (class implements Tool {
   readonly icon = '⛰';
   readonly dragPaints = true;
   mode: Mode = 'raise';
+  shape: BrushShape = 'circle';
   setHeight = 0;
 
   private stroke: GridStroke | null = null;
@@ -35,7 +37,7 @@ export const sculptTool: Tool = new (class implements Tool {
 
   onPointerMove(editor: Editor, ev: PointerEvent): void {
     const p = editor.groundPoint(ev);
-    if (p) editor.showBrush(p.x, p.z, editor.brush.size);
+    if (p) editor.showBrush(p.x, p.z, editor.brush.size, this.shape === 'square' || this.shape === 'mesa');
     else editor.hideBrush();
     if (!this.stroke || !p) return;
     this.apply(editor, p.x, p.z);
@@ -64,7 +66,7 @@ export const sculptTool: Tool = new (class implements Tool {
     const mode = this.mode;
     const avg = mode === 'smooth' ? terrain.averageHeight(x, z, radius) : 0;
 
-    terrain.forEachCellInRadius(x, z, radius, (idx, falloff) => {
+    terrain.forEachCellInBrush(x, z, radius, this.shape, (idx, falloff) => {
       this.stroke?.record(idx);
       const w = falloff * strength;
       switch (mode) {
@@ -119,13 +121,25 @@ export const sculptTool: Tool = new (class implements Tool {
         setRow.row.style.display = this.mode === 'set' ? '' : 'none';
       },
     );
+    const shapeRow = select(
+      'Brush shape',
+      [
+        { value: 'circle', label: 'Circle (soft)' },
+        { value: 'square', label: 'Square (soft)' },
+        { value: 'pillar', label: 'Pillar (round cliff)' },
+        { value: 'mesa', label: 'Mesa (square cliff)' },
+      ],
+      this.shape,
+      (v) => (this.shape = v as BrushShape),
+    );
     setRow.row.style.display = this.mode === 'set' ? '' : 'none';
     return section('Sculpt Terrain', [
       modeRow,
+      shapeRow,
       sizeRow.row,
       strengthRow.row,
       setRow.row,
-      el('p', { class: 'hint', text: 'Left-drag to sculpt · right-drag to orbit · [ ] resize brush' }),
+      el('p', { class: 'hint', text: 'Left-drag to sculpt · right-drag to orbit · [ ] resize brush. Soft = rounded hills; Pillar / Mesa have hard edges for vertical cliffs (pair with Set height for flat-topped mesas).' }),
     ]);
   }
 })();

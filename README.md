@@ -29,7 +29,7 @@ A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terra
 
 | Tool | What it does |
 |------|--------------|
-| **Sculpt** | Raise / Lower / Smooth / Flatten / Set-height brushes on the terrain. (Its *Flatten* mode levels to the height under your cursor.) |
+| **Sculpt** | Raise / Lower / Smooth / Flatten / Set-height brushes on the terrain, in four **brush shapes**: *Circle* and *Square* (soft, rounded falloff for natural hills) and *Pillar* and *Mesa* (hard-edged round/square footprints that build **vertical cliffs** — pair Mesa with *Set height* for flat-topped plateaus). The preview ring shows the footprint. (Its *Flatten* mode levels to the height under your cursor.) |
 | **Flatten** | Slowly eases terrain back toward a flat **base level** (0 m = original flat ground), a little per pass — for restoring sculpted areas when undo is no longer available (e.g. after reopening the map). Unlike Sculpt's Flatten, it always pulls toward the fixed base, raising sunken ground and lowering raised ground back to flat. Raise *Strength* to flatten faster. |
 | **Biome** | Paint biome regions (Greenmarch, Thornwood, Fen, Ember, Riven, Gravereach, Hub). Recolours the ground and tells the game what vegetation to auto-scatter there. |
 | **Lake** | Press-drag to place a circular water body. Sculpt a basin first for depth. |

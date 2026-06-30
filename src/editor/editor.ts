@@ -63,7 +63,7 @@ export class Editor {
   private readonly waterLayer = new WaterRoadLayer();
   readonly markerLayer = new MarkerLayer();
   private readonly worldGroup = new THREE.Group();
-  private brushGizmo: THREE.Mesh;
+  private brushGizmo: THREE.Object3D;
 
   private assetsDirty = false;
   private waterDirty = false;
@@ -129,25 +129,40 @@ export class Editor {
     this.worldGroup.add(this.worldBounds);
   }
 
-  private makeBrushGizmo(): THREE.Mesh {
-    const geo = new THREE.RingGeometry(0.92, 1, 48).rotateX(-Math.PI / 2);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffe14d,
-      transparent: true,
-      opacity: 0.9,
-      depthTest: false,
-      side: THREE.DoubleSide,
-    });
-    const m = new THREE.Mesh(geo, mat);
-    m.renderOrder = 998;
-    m.visible = false;
-    return m;
+  private makeBrushGizmo(): THREE.Object3D {
+    const group = new THREE.Group();
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.92, 1, 48).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide }),
+    );
+    ring.name = 'ring';
+    ring.renderOrder = 998;
+    // Square outline (unit half-extents, scaled by radius) for square / mesa brushes.
+    const square = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-1, 0, -1), new THREE.Vector3(1, 0, -1),
+        new THREE.Vector3(1, 0, 1), new THREE.Vector3(-1, 0, 1),
+      ]),
+      new THREE.LineBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthTest: false }),
+    );
+    square.name = 'square';
+    square.renderOrder = 998;
+    square.visible = false;
+    group.add(ring, square);
+    group.renderOrder = 998;
+    group.visible = false;
+    return group;
   }
 
-  showBrush(x: number, z: number, radius: number): void {
+  /** Position + size the brush preview. `square` swaps the round ring for a square outline. */
+  showBrush(x: number, z: number, radius: number, square = false): void {
     this.brushGizmo.visible = true;
     this.brushGizmo.position.set(x, this.terrain.heightAt(x, z) + 0.3, z);
     this.brushGizmo.scale.setScalar(Math.max(0.5, radius));
+    const ring = this.brushGizmo.getObjectByName('ring');
+    const sq = this.brushGizmo.getObjectByName('square');
+    if (ring) ring.visible = !square;
+    if (sq) sq.visible = square;
   }
   hideBrush(): void {
     this.brushGizmo.visible = false;
