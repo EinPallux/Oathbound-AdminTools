@@ -10,7 +10,7 @@ import {
 } from '../../format/map';
 import { el, section, select, row } from '../ui/dom';
 
-type Mode = 'spawn' | 'boss' | 'oathstone' | 'player' | 'village';
+type Mode = 'spawn' | 'boss' | 'oathstone' | 'player';
 
 function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'stone';
@@ -30,7 +30,6 @@ export const markersTool: Tool = new (class implements Tool {
   bossId: BossId = 'emberhorn';
   oathName = 'New Waystone';
   oathRoad = true;
-  villageRot = 0;
 
   private down: { x: number; y: number } | null = null;
 
@@ -83,17 +82,6 @@ export const markersTool: Tool = new (class implements Tool {
         editor.setStatus('Player spawn moved');
         break;
       }
-      case 'village': {
-        const prev = s.village ? { ...s.village } : null;
-        const next = { x, z, rot: this.villageRot };
-        editor.history.apply({
-          label: 'Place village',
-          redo: () => { s.village = { ...next }; editor.markMarkersDirty(); editor.onStateChange?.(); },
-          undo: () => { s.village = prev; editor.markMarkersDirty(); editor.onStateChange?.(); },
-        });
-        editor.setStatus('Town placed');
-        break;
-      }
     }
   }
 
@@ -130,11 +118,6 @@ export const markersTool: Tool = new (class implements Tool {
         body.append(row('Name', this.textInput(this.oathName, (v) => (this.oathName = v))), roadWrap);
       } else if (this.mode === 'player') {
         body.append(el('p', { class: 'hint', text: 'Click the ground to move the player spawn point.' }));
-      } else {
-        body.append(
-          row('Town rotation', this.numInput(Math.round((this.villageRot * 180) / Math.PI), -180, 180, (v) => (this.villageRot = (v * Math.PI) / 180))),
-          el('p', { class: 'hint', text: 'Click to place the Oathhold town. Its buildings/vendor load with it.' }),
-        );
       }
     };
     rebuild();
@@ -145,7 +128,6 @@ export const markersTool: Tool = new (class implements Tool {
         { value: 'boss', label: 'World boss' },
         { value: 'oathstone', label: 'Oathstone (travel)' },
         { value: 'player', label: 'Player spawn' },
-        { value: 'village', label: 'Town' },
       ],
       this.mode,
       (v) => {

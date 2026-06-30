@@ -14,6 +14,7 @@ import {
   type MapLake,
   type MapNpc,
   type MapOathstone,
+  type MapQuest,
   type MapPath,
   type MapSpawn,
   type OathboundMap,
@@ -36,6 +37,7 @@ export class EditorState {
   bosses: MapBoss[] = [];
   oathstones: MapOathstone[] = [];
   npcs: MapNpc[] = [];
+  quests: MapQuest[] = [];
   critters: MapCritter[] = [];
   playerSpawn: { x: number; z: number } = { x: 0, z: 0 };
   flats: MapFlat[] = [];
@@ -59,6 +61,7 @@ export class EditorState {
       bosses: this.bosses,
       oathstones: this.oathstones,
       npcs: this.npcs,
+      quests: this.quests,
       critters: this.critters,
       playerSpawn: this.playerSpawn,
       flats: this.flats,
@@ -82,6 +85,7 @@ export class EditorState {
     s.bosses = map.bosses;
     s.oathstones = map.oathstones;
     s.npcs = map.npcs;
+    s.quests = map.quests;
     s.critters = map.critters;
     s.playerSpawn = map.playerSpawn;
     s.flats = map.flats;

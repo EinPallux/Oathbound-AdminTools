@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { Tool } from '../tool';
 import type { Editor } from '../editor';
-import type { MapNpc } from '../../format/map';
+import { nextNpcId, type MapNpc } from '../../format/map';
 import { el, section, slider, select, row } from '../ui/dom';
 
 const VARIANTS = [
@@ -84,6 +84,7 @@ export const npcTool: Tool = new (class implements Tool {
   private finish(editor: Editor): void {
     if (!this.home) return;
     const npc: MapNpc = {
+      id: nextNpcId(editor.state.npcs),
       name: this.name.trim() || 'Villager',
       x: this.home.x,
       z: this.home.z,

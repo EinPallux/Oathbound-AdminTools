@@ -51,6 +51,13 @@ export class Editor {
   /** Current selection (asset placement index, or a marker) for the Select tool. */
   selectedAsset: number | null = null;
   selectedMarker: MarkerRef | null = null;
+  /** Grid snapping for placing/moving (helps align buildings into neat towns). */
+  readonly snap = { enabled: false, grid: 1 };
+
+  /** Snap a world coordinate to the grid if snapping is on. */
+  snapVal(v: number): number {
+    return this.snap.enabled && this.snap.grid > 0 ? Math.round(v / this.snap.grid) * this.snap.grid : v;
+  }
 
   private readonly assetLayer = new AssetLayer();
   private readonly waterLayer = new WaterRoadLayer();
@@ -247,6 +254,9 @@ export class Editor {
         this.brush.size = Math.max(1, this.brush.size - 2);
       } else if (ev.key === ']') {
         this.brush.size = Math.min(120, this.brush.size + 2);
+      } else if (mod && ev.key.toLowerCase() === 'd') {
+        ev.preventDefault();
+        if (this.selectedAsset != null) this.duplicateAsset(this.selectedAsset);
       } else if (ev.key === 'Delete' || ev.key === 'Backspace') {
         if (this.selectedAsset != null) this.deleteAsset(this.selectedAsset);
         else if (this.selectedMarker) this.deleteMarker(this.selectedMarker);
@@ -311,6 +321,20 @@ export class Editor {
     this.removeIndex(this.state.assets, index, 'Delete asset', () => {
       this.selectedAsset = null;
       this.markAssetsDirty();
+    });
+  }
+
+  /** Duplicate a placed asset (offset a little) and select the copy. */
+  duplicateAsset(index: number): void {
+    const a = this.state.assets[index];
+    if (!a) return;
+    const off = this.snap.enabled ? this.snap.grid : 2;
+    const copy = { ...a, x: a.x + off, z: a.z + off };
+    const start = this.state.assets.length;
+    this.history.apply({
+      label: 'Duplicate asset',
+      redo: () => { this.state.assets.splice(start, 0, copy); this.selectedAsset = start; this.markAssetsDirty(); this.onStateChange?.(); },
+      undo: () => { this.state.assets.splice(start, 1); this.selectedAsset = null; this.markAssetsDirty(); this.onStateChange?.(); },
     });
   }
 

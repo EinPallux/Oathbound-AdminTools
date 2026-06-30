@@ -4,8 +4,27 @@
 import * as THREE from 'three';
 import type { Tool } from '../tool';
 import type { Editor } from '../editor';
+import type { MarkerRef } from '../../engine/markers';
 import { ENEMY_TIERS, CRITTER_TYPES, type EnemyTier, type CritterType } from '../../format/map';
-import { el, section, slider, row, select as selectRow, button } from '../ui/dom';
+import { el, section, slider, row, select as selectRow, button, checkbox } from '../ui/dom';
+
+type DragRef = MarkerRef | { type: 'asset'; index: number };
+
+/** Return the mutable {x,z} object behind a drag ref (so it can be moved in place). */
+function entXZ(editor: Editor, d: DragRef): { x: number; z: number } | null {
+  const s = editor.state;
+  switch (d.type) {
+    case 'asset': return s.assets[d.index] ?? null;
+    case 'spawn': return s.spawns[d.index] ?? null;
+    case 'boss': return s.bosses[d.index] ?? null;
+    case 'oathstone': return s.oathstones[d.index] ?? null;
+    case 'npc': return s.npcs[d.index] ?? null;
+    case 'critter': return s.critters[d.index] ?? null;
+    case 'player': return s.playerSpawn;
+    case 'village': return s.village;
+    default: return null;
+  }
+}
 
 export const selectTool: Tool = new (class implements Tool {
   readonly id = 'select';
@@ -15,6 +34,9 @@ export const selectTool: Tool = new (class implements Tool {
 
   private down: { x: number; y: number } | null = null;
   private ring: THREE.Mesh | null = null;
+  private dragRef: DragRef | null = null;
+  private dragBefore: { x: number; z: number } | null = null;
+  private dragMoved = false;
 
   onActivate(editor: Editor): void {
     if (!this.ring) {
@@ -30,25 +52,74 @@ export const selectTool: Tool = new (class implements Tool {
     if (this.ring) editor.viewport.scene.remove(this.ring);
   }
 
-  onPointerDown(_e: Editor, ev: PointerEvent): void {
-    if (ev.button === 0) this.down = { x: ev.clientX, y: ev.clientY };
-  }
-  onPointerUp(editor: Editor, ev: PointerEvent): void {
-    if (ev.button !== 0 || !this.down) return;
-    const moved = Math.hypot(ev.clientX - this.down.x, ev.clientY - this.down.y);
-    this.down = null;
-    if (moved > 6) return;
-    const marker = editor.pickMarker(ev);
-    if (marker) {
-      editor.selectedMarker = marker;
-      editor.selectedAsset = null;
-    } else {
-      const a = editor.pickAsset(ev);
-      editor.selectedAsset = a;
-      editor.selectedMarker = null;
+  onPointerDown(editor: Editor, ev: PointerEvent): void {
+    if (ev.button !== 0) return;
+    this.down = { x: ev.clientX, y: ev.clientY };
+    this.dragMoved = false;
+    // Grab whatever is under the cursor (markers first, then assets) to select + drag-move.
+    const m = editor.pickMarker(ev);
+    this.dragRef = m ?? (() => { const a = editor.pickAsset(ev); return a != null ? ({ type: 'asset', index: a } as DragRef) : null; })();
+    this.applySelection(editor, this.dragRef);
+    if (this.dragRef) {
+      const obj = entXZ(editor, this.dragRef);
+      this.dragBefore = obj ? { x: obj.x, z: obj.z } : null;
+      editor.viewport.enableControls(false); // drag moves the object, not the camera
     }
     this.updateRing(editor);
     editor.onStateChange?.();
+  }
+
+  onPointerMove(editor: Editor, ev: PointerEvent): void {
+    if (!this.down || !this.dragRef) return;
+    if (!this.dragMoved && Math.hypot(ev.clientX - this.down.x, ev.clientY - this.down.y) < 4) return;
+    const p = editor.groundPoint(ev);
+    if (!p) return;
+    const obj = entXZ(editor, this.dragRef);
+    if (!obj) return;
+    this.dragMoved = true;
+    obj.x = editor.snapVal(p.x);
+    obj.z = editor.snapVal(p.z);
+    if (this.dragRef.type === 'asset') editor.markAssetsDirty();
+    else editor.markMarkersDirty();
+    this.updateRing(editor);
+  }
+
+  onPointerUp(editor: Editor, ev: PointerEvent): void {
+    if (ev.button !== 0) return;
+    const ref = this.dragRef;
+    const before = this.dragBefore;
+    this.dragRef = null;
+    this.dragBefore = null;
+    this.down = null;
+    if (ref) editor.viewport.enableControls(true);
+    if (ref && this.dragMoved && before) {
+      const obj = entXZ(editor, ref);
+      if (obj) {
+        const after = { x: obj.x, z: obj.z };
+        const dirty = (): void => { ref.type === 'asset' ? editor.markAssetsDirty() : editor.markMarkersDirty(); };
+        editor.history.push({
+          label: 'Move',
+          undo: () => { const o = entXZ(editor, ref); if (o) { o.x = before.x; o.z = before.z; } dirty(); this.updateRing(editor); editor.onStateChange?.(); },
+          redo: () => { const o = entXZ(editor, ref); if (o) { o.x = after.x; o.z = after.z; } dirty(); this.updateRing(editor); editor.onStateChange?.(); },
+        });
+        editor.setStatus('Moved (drag)');
+      }
+    }
+    this.updateRing(editor);
+    editor.onStateChange?.();
+  }
+
+  private applySelection(editor: Editor, ref: DragRef | null): void {
+    if (ref && ref.type === 'asset') {
+      editor.selectedAsset = ref.index;
+      editor.selectedMarker = null;
+    } else if (ref) {
+      editor.selectedMarker = ref;
+      editor.selectedAsset = null;
+    } else {
+      editor.selectedAsset = null;
+      editor.selectedMarker = null;
+    }
   }
 
   private markerPos(editor: Editor): { x: number; z: number } | null {
@@ -90,15 +161,26 @@ export const selectTool: Tool = new (class implements Tool {
           slider('Scale', { min: 0.2, max: 6, step: 0.05, value: a.scale, onInput: (v) => { a.scale = v; editor.markAssetsDirty(); } }).row,
           slider('Rotation', { min: 0, max: 360, step: 1, value: (a.rot * 180) / Math.PI, onInput: (v) => { a.rot = (v * Math.PI) / 180; editor.markAssetsDirty(); }, format: (v) => `${v.toFixed(0)}°` }).row,
           slider('Height (Y)', { min: -20, max: 40, step: 0.1, value: a.y ?? 0, onInput: (v) => { a.y = v; editor.markAssetsDirty(); }, format: (v) => `${v.toFixed(1)}m` }).row,
-          button('Delete asset', () => editor.deleteAsset(idx), 'danger'),
+          el('div', { class: 'btn-row' }, [
+            button('Duplicate (Ctrl+D)', () => editor.duplicateAsset(idx)),
+            button('Delete', () => editor.deleteAsset(idx), 'danger'),
+          ]),
         );
       }
     } else if (editor.selectedMarker) {
       wrap.append(this.markerPanel(editor));
     } else {
-      wrap.append(el('p', { class: 'hint', text: 'Click an asset or marker to select it.' }));
+      wrap.append(el('p', { class: 'hint', text: 'Click an asset/marker to select it · drag it to move.' }));
     }
-    return section('Select', [wrap]);
+    const snap = slider('Grid size', {
+      min: 0.25, max: 10, step: 0.25, value: editor.snap.grid,
+      onInput: (v) => (editor.snap.grid = v), format: (v) => `${v}m`,
+    });
+    return section('Select', [
+      checkbox('Snap to grid (move/place)', editor.snap.enabled, (v) => (editor.snap.enabled = v)),
+      snap.row,
+      wrap,
+    ]);
   }
 
   private markerPanel(editor: Editor): HTMLElement {

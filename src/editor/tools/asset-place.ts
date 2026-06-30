@@ -58,7 +58,9 @@ export const assetTool: Tool = new (class implements Tool {
     this.refreshPreview(editor);
     if (p && this.preview) {
       this.preview.visible = true;
-      this.preview.position.set(p.x, editor.terrain.heightAt(p.x, p.z) + previewYLift(editor.placement.asset, editor.placement.scale) + editor.placement.y, p.z);
+      const sx = editor.snapVal(p.x);
+      const sz = editor.snapVal(p.z);
+      this.preview.position.set(sx, editor.terrain.heightAt(sx, sz) + previewYLift(editor.placement.asset, editor.placement.scale) + editor.placement.y, sz);
       this.preview.scale.setScalar(editor.placement.scale);
       editor.showBrush(p.x, p.z, editor.placement.scatterCount > 1 ? editor.placement.scatterRadius : editor.placement.scale);
     } else if (this.preview) {
@@ -93,6 +95,8 @@ export const assetTool: Tool = new (class implements Tool {
   }
 
   private placeAt(editor: Editor, x: number, z: number): void {
+    x = editor.snapVal(x);
+    z = editor.snapVal(z);
     this.lastPlace = { x, z };
     const pl = editor.placement;
     const n = Math.max(1, Math.round(pl.scatterCount));

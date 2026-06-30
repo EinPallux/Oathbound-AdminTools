@@ -5,6 +5,7 @@ import type { Editor } from '../editor';
 import { EditorState } from '../state';
 import { el, button, row, select, checkbox } from './dom';
 import { openAssetBuilder } from './asset-builder';
+import { openQuestEditor } from './quest-editor';
 import { loadHeightmap } from '../../engine/heightmap';
 import {
   autosave, deleteLocal, downloadMap, importMapFile, listSaves, loadLocal, saveLocal,
@@ -61,6 +62,7 @@ export class EditorUI {
       button('Import', () => this.doImport()),
       button('Export JSON', () => this.doExport(), 'primary'),
       button('Asset Builder', () => openAssetBuilder(this.editor)),
+      button('Quests & Dialog', () => openQuestEditor(this.editor)),
     );
 
     const left = el('div', { class: 'left-rail' }, [this.toolbar, this.panel]);
