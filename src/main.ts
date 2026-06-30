@@ -19,8 +19,8 @@ new EditorUI(editor, uiRoot);
 try {
   const raw = loadAutosave();
   if (raw) {
-    const { state, heights, biomes } = EditorState.fromMap(raw);
-    editor.loadState(state, heights, biomes);
+    const { state, heights, biomes, water } = EditorState.fromMap(raw);
+    editor.loadState(state, heights, biomes, water);
     editor.setStatus(`Restored your last session “${state.name}”. New map to start fresh.`);
   }
 } catch {

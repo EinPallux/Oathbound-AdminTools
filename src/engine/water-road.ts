@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import type { EditorTerrain } from './terrain';
-import type { MapLake, MapPath } from '../format/map';
+import { hasWater, waterSurfaceGeometry, type MapLake, type MapPath } from '../format/map';
 import { buildRibbon } from './ribbon';
 
 const lakeMat = new THREE.MeshStandardMaterial({
@@ -56,6 +56,23 @@ export class WaterRoadLayer {
 
   rebuild(lakes: MapLake[], rivers: MapPath[], roads: MapPath[], terrain: EditorTerrain): void {
     this.clear();
+
+    // Painted water (the Water tool) — a surface mesh that fills the ground up to each
+    // cell's painted level, shown only where it sits above the terrain.
+    if (hasWater(terrain.water)) {
+      const { positions, indices } = waterSurfaceGeometry(terrain.water, terrain.heights, terrain.res, terrain.size);
+      if (positions.length) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setIndex(indices);
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, lakeMat);
+        mesh.name = 'painted-water';
+        mesh.frustumCulled = false;
+        this.group.add(mesh);
+        this.meshes.push(mesh);
+      }
+    }
 
     for (let i = 0; i < lakes.length; i++) {
       const lk = lakes[i];

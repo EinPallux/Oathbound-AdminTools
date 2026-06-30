@@ -144,8 +144,8 @@ export class EditorUI {
     const raw = await importMapFile();
     if (!raw) return;
     try {
-      const { state, heights, biomes } = EditorState.fromMap(raw);
-      this.editor.loadState(state, heights, biomes);
+      const { state, heights, biomes, water } = EditorState.fromMap(raw);
+      this.editor.loadState(state, heights, biomes, water);
     } catch (e) {
       this.editor.setStatus(`Import failed: ${(e as Error).message}`);
     }

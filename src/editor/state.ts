@@ -6,7 +6,10 @@ import {
   MAP_FORMAT_VERSION,
   normalizeMap,
   packHeights,
+  packWater,
+  hasWater,
   unpackHeights,
+  unpackWater,
   type AssetDef,
   type MapBoss,
   type MapFlat,
@@ -52,6 +55,7 @@ export class EditorState {
       res: this.res,
       heightsPacked: packHeights(terrain.heights),
       biomes: Array.from(terrain.biomes),
+      waterPacked: hasWater(terrain.water) ? packWater(terrain.water) : undefined,
       lakes: this.lakes,
       rivers: this.rivers,
       roads: this.roads,
@@ -70,7 +74,7 @@ export class EditorState {
   }
 
   /** Load from a parsed map: returns the normalized map + the decoded terrain arrays. */
-  static fromMap(raw: unknown): { state: EditorState; map: OathboundMap; heights: Float32Array; biomes: Uint8Array } {
+  static fromMap(raw: unknown): { state: EditorState; map: OathboundMap; heights: Float32Array; biomes: Uint8Array; water: Float32Array | null } {
     const map = normalizeMap(raw);
     const s = new EditorState();
     s.name = map.name;
@@ -92,6 +96,7 @@ export class EditorState {
     s.village = map.village;
     const heights = unpackHeights(map);
     const biomes = Uint8Array.from(map.biomes);
-    return { state: s, map, heights, biomes };
+    const water = unpackWater(map);
+    return { state: s, map, heights, biomes, water };
   }
 }

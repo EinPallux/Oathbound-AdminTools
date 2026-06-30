@@ -413,6 +413,7 @@ export class Editor {
         const idx = z * res + x;
         next.heights[idx] = old.heightAt(wx, wz); // bilinear, clamps to the old edges
         next.biomes[idx] = old.biomeAt(wx, wz);
+        next.water[idx] = old.waterAt(wx, wz); // nearest (NaN where dry)
       }
     }
     next.refresh();
@@ -445,9 +446,9 @@ export class Editor {
   }
 
   /** Load decoded terrain + state (from an imported/loaded map). */
-  loadState(state: EditorState, heights: Float32Array, biomes: Uint8Array): void {
+  loadState(state: EditorState, heights: Float32Array, biomes: Uint8Array, water?: Float32Array | null): void {
     this.swapTerrain(new EditorTerrain(state.size, state.res));
-    this.terrain.load(heights, biomes);
+    this.terrain.load(heights, biomes, water);
     this.state = state;
     this.selectedAsset = null;
     this.history.clear();

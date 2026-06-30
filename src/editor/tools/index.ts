@@ -4,7 +4,7 @@ import type { Tool } from '../tool';
 import { sculptTool } from './sculpt';
 import { flattenTool } from './flatten';
 import { biomeTool } from './biome';
-import { lakeTool } from './lake';
+import { waterTool } from './water';
 import { riverTool, roadTool } from './path';
 import { assetTool } from './asset-place';
 import { eraseTool } from './erase';
@@ -17,7 +17,7 @@ export const TOOLS: Tool[] = [
   sculptTool,
   flattenTool,
   biomeTool,
-  lakeTool,
+  waterTool,
   riverTool,
   roadTool,
   assetTool,

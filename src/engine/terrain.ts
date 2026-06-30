@@ -17,6 +17,8 @@ export class EditorTerrain {
   private readonly half: number;
   heights: Float32Array;
   biomes: Uint8Array;
+  /** Painted water-surface height per cell; NaN = dry (no water). Parallel to heights. */
+  water: Float32Array;
   readonly mesh: THREE.Mesh;
   private readonly geo: THREE.BufferGeometry;
   private dirty = false;
@@ -28,6 +30,7 @@ export class EditorTerrain {
     this.half = size / 2;
     this.heights = new Float32Array(res * res);
     this.biomes = new Uint8Array(res * res);
+    this.water = new Float32Array(res * res).fill(NaN); // all dry
 
     this.geo = new THREE.BufferGeometry();
     const n = res * res;
@@ -128,10 +131,20 @@ export class EditorTerrain {
   }
 
   /** Replace the whole field (e.g. on load) and rebuild. */
-  load(heights: Float32Array, biomes: Uint8Array): void {
+  load(heights: Float32Array, biomes: Uint8Array, water?: Float32Array | null): void {
     if (heights.length === this.heights.length) this.heights.set(heights);
     if (biomes.length === this.biomes.length) this.biomes.set(biomes);
+    if (water && water.length === this.water.length) this.water.set(water);
+    else this.water.fill(NaN);
     this.refresh();
+  }
+
+  /** Nearest-cell painted water level at world (x, z); NaN if dry. */
+  waterAt(x: number, z: number): number {
+    const { res, cell, half } = this;
+    const xi = clamp(Math.round((x + half) / cell), 0, res - 1);
+    const zi = clamp(Math.round((z + half) / cell), 0, res - 1);
+    return this.water[zi * res + xi];
   }
 
   // ── Sampling ────────────────────────────────────────────────────────────────
