@@ -8,6 +8,7 @@ import type { Editor } from '../editor';
 import type { AssetCategory, AssetDef, AssetPart, PrimitiveShape } from '../../format/map';
 import { customAssetGeometry } from '../../oathbound/geometry';
 import { invalidateAssetGeometry } from '../../engine/asset-render';
+import { invalidateThumbnail } from '../../engine/thumbnails';
 import { el, button, row, select } from './dom';
 import { modal, closeModal } from './app';
 
@@ -223,6 +224,7 @@ export function openAssetBuilder(editor: Editor): void {
       if (idx >= 0) editor.state.customAssets[idx] = clone(def);
       else editor.state.customAssets.push(clone(def));
       invalidateAssetGeometry(`custom:${def.id}`);
+      invalidateThumbnail(`custom:${def.id}`);
     }
     editor.placement.asset = `custom:${def.id}`;
     editor.markAssetsDirty();

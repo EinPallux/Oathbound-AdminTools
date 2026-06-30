@@ -9,6 +9,7 @@ import type { AssetCategory, PlacedAsset } from '../../format/map';
 import { BUILTIN_ASSETS } from '../../format/assets-builtin';
 import { PRESET_ASSETS } from '../../format/presets';
 import { makePreviewMesh, previewYLift, defaultScaleFor } from '../../engine/asset-render';
+import { assetThumbnail } from '../../engine/thumbnails';
 import { el, section, slider, checkbox } from '../ui/dom';
 
 const CATEGORY_ORDER: AssetCategory[] = ['tree', 'plant', 'rock', 'structure', 'misc'];
@@ -142,7 +143,7 @@ export const assetTool: Tool = new (class implements Tool {
     const addBtn = (id: string, label: string): void => {
       const b = el('button', {
         class: `asset-chip${editor.placement.asset === id ? ' active' : ''}`,
-        text: label,
+        title: label,
         onClick: () => {
           editor.placement.asset = id;
           editor.placement.scale = defaultScaleFor(id);
@@ -150,6 +151,9 @@ export const assetTool: Tool = new (class implements Tool {
           editor.onStateChange?.();
         },
       });
+      const url = assetThumbnail(id, editor.state.customAssets);
+      if (url) b.append(el('img', { class: 'chip-thumb', src: url, alt: label }));
+      b.append(el('span', { class: 'chip-label', text: label }));
       grid.append(b);
     };
     for (const cat of CATEGORY_ORDER) {

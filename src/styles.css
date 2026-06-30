@@ -89,15 +89,26 @@ button.btn, .tool-btn { font: inherit; cursor: pointer; }
 
 select option { background: var(--panel-2); }
 
-/* Asset library */
-.asset-lib { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
-.lib-cat { width: 100%; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-top: 6px; }
+/* Asset library — thumbnail tiles */
+.asset-lib { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+.lib-cat { grid-column: 1 / -1; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-top: 6px; }
 .asset-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
-  border-radius: 6px; padding: 5px 8px; font-size: 12px; cursor: pointer;
+  border-radius: 7px; padding: 5px 4px 4px; cursor: pointer; overflow: hidden;
+}
+.chip-thumb {
+  width: 100%; height: 56px; object-fit: contain; pointer-events: none;
+  background: radial-gradient(circle at 50% 38%, #28344a, #151c26); border-radius: 5px;
+}
+.chip-label {
+  font-size: 10px; line-height: 1.15; text-align: center; color: var(--muted);
+  width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .asset-chip:hover { border-color: #3a4a5e; }
-.asset-chip.active { border-color: var(--accent); background: #1a2c44; color: #fff; }
+.asset-chip:hover .chip-label { color: var(--text); }
+.asset-chip.active { border-color: var(--accent); background: #1a2c44; }
+.asset-chip.active .chip-label { color: #fff; }
 
 .sel-title { font-weight: 600; margin: 0 0 4px; }
 

@@ -33,7 +33,7 @@ A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terra
 | **Biome** | Paint biome regions (Greenmarch, Thornwood, Fen, Ember, Riven, Gravereach, Hub). Recolours the ground and tells the game what vegetation to auto-scatter there. |
 | **Lake** | Press-drag to place a circular water body. Sculpt a basin first for depth. |
 | **River / Road** | Click to drop polyline points, double-click or Enter to finish. Draped over the terrain. |
-| **Assets** | Place props (single or scattered) from the library — every built-in Oathbound prop, a **pre-made set** of buildings / walls / towers / town props / ruins / extra trees & nature, plus your own custom assets. |
+| **Assets** | Place props (single or scattered) from the library — every built-in Oathbound prop, a **pre-made set** of buildings / walls / towers / town props / ruins / extra trees & nature, plus your own custom assets. Each shown as a **live 3D thumbnail**. |
 | **Erase** | Drag to remove placed props within the brush. |
 | **Markers** | Place enemy spawns, world bosses, Oathstone travel points, the player spawn and the town. |
 | **NPCs** | Place friendly NPCs (villager / guard / merchant / elder) and click out a looped patrol route — or leave them idle. They walk it in-game. |
