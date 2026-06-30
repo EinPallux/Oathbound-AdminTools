@@ -5,9 +5,10 @@
 import * as THREE from 'three';
 import type { EditorTerrain } from './terrain';
 import type { EditorState } from '../editor/state';
+import type { CritterType } from '../format/map';
 import { buildPlayerModel } from '../oathbound/player-model';
 
-export type MarkerType = 'spawn' | 'boss' | 'oathstone' | 'player' | 'village' | 'npc';
+export type MarkerType = 'spawn' | 'boss' | 'oathstone' | 'player' | 'village' | 'npc' | 'critter';
 export interface MarkerRef {
   type: MarkerType;
   index: number;
@@ -61,6 +62,40 @@ function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number,
 export const NPC_TINTS = [0x5b7da8, 0x8a8f99, 0x9c6b3f, 0x6a5a72];
 const SKIN_MAT = new THREE.MeshLambertMaterial({ color: 0xe0b48c });
 const ROUTE_MAT = new THREE.LineBasicMaterial({ color: 0x6fe0a0, transparent: true, opacity: 0.85, depthTest: false });
+
+// Ambient critter zones — shared materials so frequent marker rebuilds don't leak.
+const CRITTER_COLORS: Record<string, number> = { birds: 0x9aa1ad, critters: 0x8a7a5a, butterflies: 0xff7ab0, fireflies: 0xffe066 };
+const CRITTER_LABELS: Record<string, string> = { birds: 'Birds', critters: 'Critters', butterflies: 'Butterflies', fireflies: 'Fireflies' };
+const CRITTER_RING_MATS: Record<string, THREE.MeshBasicMaterial> = {};
+const CRITTER_ICON_MATS: Record<string, THREE.Material> = {};
+for (const [t, c] of Object.entries(CRITTER_COLORS)) {
+  CRITTER_RING_MATS[t] = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthTest: false });
+  CRITTER_ICON_MATS[t] = new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide, ...(t === 'fireflies' ? { emissive: c, emissiveIntensity: 0.8 } : {}) });
+}
+
+function critterIcon(type: CritterType): THREE.Object3D {
+  const mat = CRITTER_ICON_MATS[type];
+  const g = new THREE.Group();
+  if (type === 'birds') {
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.5, 5), mat);
+    body.rotation.x = Math.PI / 2;
+    g.add(body, new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.22), mat));
+  } else if (type === 'critters') {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.3), mat);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.12), mat);
+    head.position.set(0, 0.04, 0.2);
+    g.add(body, head);
+  } else if (type === 'butterflies') {
+    const w1 = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.22), mat);
+    w1.position.x = 0.08; w1.rotation.y = 0.5;
+    const w2 = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.22), mat);
+    w2.position.x = -0.08; w2.rotation.y = -0.5;
+    g.add(w1, w2);
+  } else {
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), mat));
+  }
+  return g;
+}
 
 const SPAWN_MAT = new THREE.MeshLambertMaterial({ color: 0xd64545 });
 const BOSS_MAT = new THREE.MeshLambertMaterial({ color: 0xb145d6 });
@@ -196,6 +231,31 @@ export class MarkerLayer {
         line.renderOrder = 996;
         this.group.add(line);
       }
+    });
+
+    // Ambient critter zones: a radius ring + a few sample creatures + a count label.
+    state.critters.forEach((cr, i) => {
+      const g = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(Math.max(0.5, cr.radius * 0.96), Math.max(0.6, cr.radius), 44).rotateX(-Math.PI / 2),
+        CRITTER_RING_MATS[cr.type] ?? CRITTER_RING_MATS.birds,
+      );
+      ring.position.y = 0.1;
+      ring.renderOrder = 995;
+      g.add(ring);
+      const yBase = cr.type === 'birds' ? 3.5 : cr.type === 'critters' ? 0.25 : 1.3;
+      const r = cr.radius;
+      for (const [ox, oz] of [[0, 0], [r * 0.4, r * 0.2], [-r * 0.35, -r * 0.3]] as [number, number][]) {
+        const ic = critterIcon(cr.type);
+        ic.position.set(ox, yBase, oz);
+        g.add(ic);
+      }
+      const col = (CRITTER_COLORS[cr.type] ?? 0xffffff).toString(16).padStart(6, '0');
+      const label = labelSprite(`${CRITTER_LABELS[cr.type] ?? cr.type} ×${cr.count}`, `#${col}`);
+      label.position.y = Math.max(2.2, yBase + 1.0);
+      g.add(label);
+      g.position.set(cr.x, terrain.heightAt(cr.x, cr.z), cr.z);
+      this.add(g, { type: 'critter', index: i });
     });
   }
 

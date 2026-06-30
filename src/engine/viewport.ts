@@ -15,6 +15,10 @@ export class Viewport {
   private updateCb: ((dt: number) => void) | null = null;
   private readonly raycaster = new THREE.Raycaster();
   private readonly ndc = new THREE.Vector2();
+  private readonly keys = new Set<string>();
+  private readonly fwd = new THREE.Vector3();
+  private readonly right = new THREE.Vector3();
+  private readonly move = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -47,7 +51,39 @@ export class Viewport {
     this.scene.add(fill);
 
     window.addEventListener('resize', this.onResize);
+    // WASD fly movement (Q/E down/up, Shift to sprint). Ignored while typing in a field.
+    window.addEventListener('keydown', (e) => {
+      const t = document.activeElement as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+      this.keys.add(e.code);
+    });
+    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    window.addEventListener('blur', () => this.keys.clear());
     this.onResize();
+  }
+
+  /** Translate the camera + orbit target together from WASD/QE input (a free fly). */
+  private updateFly(dt: number): void {
+    const k = this.keys;
+    const f = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
+    const r = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
+    const up = (k.has('KeyE') ? 1 : 0) - (k.has('KeyQ') ? 1 : 0);
+    if (!f && !r && !up) return;
+    // Forward = camera→target flattened to the ground plane.
+    this.fwd.subVectors(this.controls.target, this.camera.position);
+    this.fwd.y = 0;
+    if (this.fwd.lengthSq() < 1e-6) this.fwd.set(0, 0, -1);
+    this.fwd.normalize();
+    this.right.crossVectors(this.fwd, this.camera.up).normalize();
+    const dist = this.camera.position.distanceTo(this.controls.target);
+    const speed = Math.min(260, Math.max(12, dist * 0.55)) * (k.has('ShiftLeft') || k.has('ShiftRight') ? 3 : 1);
+    this.move.set(0, 0, 0);
+    this.move.addScaledVector(this.fwd, f);
+    this.move.addScaledVector(this.right, r);
+    this.move.y += up;
+    if (this.move.lengthSq() > 0) this.move.normalize().multiplyScalar(speed * dt);
+    this.camera.position.add(this.move);
+    this.controls.target.add(this.move);
   }
 
   private onResize = (): void => {
@@ -70,6 +106,7 @@ export class Viewport {
       this.raf = requestAnimationFrame(tick);
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
+      this.updateFly(dt);
       this.controls.update();
       this.updateCb?.(dt);
       this.renderer.render(this.scene, this.camera);

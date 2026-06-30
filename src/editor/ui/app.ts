@@ -3,8 +3,9 @@
 
 import type { Editor } from '../editor';
 import { EditorState } from '../state';
-import { el, button, row, select } from './dom';
+import { el, button, row, select, checkbox } from './dom';
 import { openAssetBuilder } from './asset-builder';
+import { loadHeightmap } from '../../engine/heightmap';
 import {
   autosave, deleteLocal, downloadMap, importMapFile, listSaves, loadLocal, saveLocal,
 } from '../storage';
@@ -54,6 +55,7 @@ export class EditorUI {
       this.redoBtn,
       button('New', () => this.openNewMap()),
       button('Resize', () => this.openResize()),
+      button('Heightmap', () => this.openHeightmap()),
       button('Save', () => this.doSave()),
       button('Load', () => this.openSaves()),
       button('Import', () => this.doImport()),
@@ -62,7 +64,7 @@ export class EditorUI {
     );
 
     const left = el('div', { class: 'left-rail' }, [this.toolbar, this.panel]);
-    const statusbar = el('div', { class: 'statusbar' }, [this.statusEl, el('span', { class: 'hint-right', text: 'Right-drag orbit · wheel zoom · middle-drag pan' })]);
+    const statusbar = el('div', { class: 'statusbar' }, [this.statusEl, el('span', { class: 'hint-right', text: 'WASD/QE fly (Shift sprint) · right-drag orbit · wheel zoom' })]);
     this.root.append(topbar, left, statusbar);
   }
 
@@ -99,6 +101,8 @@ export class EditorUI {
         stat('spawns', s.spawns.length),
         stat('bosses', s.bosses.length),
         stat('stones', s.oathstones.length),
+        stat('npcs', s.npcs.length),
+        stat('critters', s.critters.length),
         stat('custom', s.customAssets.length),
       ]),
     ]);
@@ -201,6 +205,41 @@ export class EditorUI {
       button('Resize', () => {
         this.editor.resizeMap(Math.max(100, size), parseInt(res, 10));
         closeModal();
+      }, 'primary'),
+    ]);
+  }
+
+  private openHeightmap(): void {
+    let min = 0;
+    let max = 30;
+    let invert = false;
+    const fileInput = el('input', { type: 'file', accept: 'image/*' }) as HTMLInputElement;
+    const minI = el('input', { type: 'number', value: min, step: 1 }) as HTMLInputElement;
+    minI.addEventListener('input', () => (min = parseFloat(minI.value || '0')));
+    const maxI = el('input', { type: 'number', value: max, step: 1 }) as HTMLInputElement;
+    maxI.addEventListener('input', () => (max = parseFloat(maxI.value || '30')));
+    const body = el('div', {}, [
+      row('Image', fileInput),
+      row('Min height — black (m)', minI),
+      row('Max height — white (m)', maxI),
+      checkbox('Invert (dark = high)', invert, (v) => (invert = v)),
+      el('p', { class: 'hint', text: `Resampled to the current ${this.editor.state.res}² grid and applied to the whole map. White = high, black = low. A square greyscale image works best. (Undoable.)` }),
+    ]);
+    modal('Import Heightmap', body, [
+      button('Cancel', () => closeModal()),
+      button('Import', async () => {
+        const f = fileInput.files?.[0];
+        if (!f) {
+          this.editor.setStatus('Pick an image first.');
+          return;
+        }
+        try {
+          const heights = await loadHeightmap(f, this.editor.state.res, { minHeight: min, maxHeight: max, invert });
+          this.editor.applyHeights(heights);
+          closeModal();
+        } catch (e) {
+          this.editor.setStatus(`Heightmap import failed: ${(e as Error).message}`);
+        }
       }, 'primary'),
     ]);
   }

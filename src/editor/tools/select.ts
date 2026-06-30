@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { Tool } from '../tool';
 import type { Editor } from '../editor';
-import { ENEMY_TIERS, type EnemyTier } from '../../format/map';
+import { ENEMY_TIERS, CRITTER_TYPES, type EnemyTier, type CritterType } from '../../format/map';
 import { el, section, slider, row, select as selectRow, button } from '../ui/dom';
 
 export const selectTool: Tool = new (class implements Tool {
@@ -59,6 +59,7 @@ export const selectTool: Tool = new (class implements Tool {
     if (m.type === 'boss') return s.bosses[m.index] ?? null;
     if (m.type === 'oathstone') return s.oathstones[m.index] ?? null;
     if (m.type === 'npc') return s.npcs[m.index] ?? null;
+    if (m.type === 'critter') return s.critters[m.index] ?? null;
     if (m.type === 'player') return s.playerSpawn;
     if (m.type === 'village') return s.village;
     return null;
@@ -88,6 +89,7 @@ export const selectTool: Tool = new (class implements Tool {
           el('p', { class: 'hint', text: `x ${a.x.toFixed(1)}, z ${a.z.toFixed(1)}` }),
           slider('Scale', { min: 0.2, max: 6, step: 0.05, value: a.scale, onInput: (v) => { a.scale = v; editor.markAssetsDirty(); } }).row,
           slider('Rotation', { min: 0, max: 360, step: 1, value: (a.rot * 180) / Math.PI, onInput: (v) => { a.rot = (v * Math.PI) / 180; editor.markAssetsDirty(); }, format: (v) => `${v.toFixed(0)}°` }).row,
+          slider('Height (Y)', { min: -20, max: 40, step: 0.1, value: a.y ?? 0, onInput: (v) => { a.y = v; editor.markAssetsDirty(); }, format: (v) => `${v.toFixed(1)}m` }).row,
           button('Delete asset', () => editor.deleteAsset(idx), 'danger'),
         );
       }
@@ -146,6 +148,16 @@ export const selectTool: Tool = new (class implements Tool {
           { value: '2', label: 'Merchant' }, { value: '3', label: 'Elder' },
         ], String(npc.variant ?? 0), (v) => { npc.variant = parseInt(v, 10); editor.markMarkersDirty(); }),
         el('p', { class: 'hint', text: `${npc.route.length} patrol point(s). Re-add via the NPCs tool to change the route.` }),
+        del,
+      );
+    } else if (m.type === 'critter') {
+      const cr = s.critters[m.index];
+      if (!cr) return wrap;
+      wrap.append(
+        el('p', { class: 'sel-title', text: `Critters · ${cr.type}` }),
+        selectRow('Type', CRITTER_TYPES.map((t) => ({ value: t, label: t })), cr.type, (v) => { cr.type = v as CritterType; editor.markMarkersDirty(); }),
+        slider('Radius', { min: 3, max: 80, step: 1, value: cr.radius, onInput: (v) => { cr.radius = v; editor.markMarkersDirty(); }, format: (v) => `${v.toFixed(0)}m` }).row,
+        slider('Count', { min: 1, max: 40, step: 1, value: cr.count, onInput: (v) => { cr.count = Math.round(v); editor.markMarkersDirty(); }, format: (v) => `${v.toFixed(0)}` }).row,
         del,
       );
     } else if (m.type === 'player') {

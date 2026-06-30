@@ -92,7 +92,7 @@ export class AssetLayer {
       mesh.name = `asset:${assetId}`;
       for (let s = 0; s < indices.length; s++) {
         const p = assets[indices[s]];
-        const y = terrain.heightAt(p.x, p.z) + yLiftFor(assetId, p.scale);
+        const y = terrain.heightAt(p.x, p.z) + yLiftFor(assetId, p.scale) + (p.y ?? 0);
         _obj.position.set(p.x, y, p.z);
         _obj.rotation.set(0, p.rot, 0);
         _obj.scale.setScalar(p.scale);

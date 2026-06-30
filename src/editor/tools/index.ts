@@ -9,6 +9,7 @@ import { assetTool } from './asset-place';
 import { eraseTool } from './erase';
 import { markersTool } from './markers-tool';
 import { npcTool } from './npc-tool';
+import { crittersTool } from './critters-tool';
 import { selectTool } from './select';
 
 export const TOOLS: Tool[] = [
@@ -21,5 +22,6 @@ export const TOOLS: Tool[] = [
   eraseTool,
   markersTool,
   npcTool,
+  crittersTool,
   selectTool,
 ];

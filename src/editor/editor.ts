@@ -24,6 +24,8 @@ export interface PlacementSettings {
   jitterScale: number;
   scatterCount: number;
   scatterRadius: number;
+  /** Additive vertical offset applied to newly placed assets. */
+  y: number;
 }
 
 export class Editor {
@@ -43,6 +45,7 @@ export class Editor {
     jitterScale: 0.25,
     scatterCount: 1,
     scatterRadius: 6,
+    y: 0,
   };
 
   /** Current selection (asset placement index, or a marker) for the Select tool. */
@@ -321,6 +324,7 @@ export class Editor {
     else if (ref.type === 'boss') this.removeIndex(s.bosses, ref.index, 'Delete boss', after);
     else if (ref.type === 'oathstone') this.removeIndex(s.oathstones, ref.index, 'Delete Oathstone', after);
     else if (ref.type === 'npc') this.removeIndex(s.npcs, ref.index, 'Delete NPC', after);
+    else if (ref.type === 'critter') this.removeIndex(s.critters, ref.index, 'Delete critters', after);
     else if (ref.type === 'village') {
       const had = s.village;
       if (!had) return;
@@ -381,6 +385,24 @@ export class Editor {
     this.markAllDirty();
     this.onStateChange?.();
     this.setStatus(`Resized to ${size}m · ${res}² (content preserved)`);
+  }
+
+  /** Replace the whole height grid (e.g. from a heightmap import) — one undoable step. */
+  applyHeights(next: Float32Array): void {
+    if (next.length !== this.terrain.heights.length) {
+      this.setStatus(`Heightmap size mismatch (expected ${this.terrain.res}² cells).`);
+      return;
+    }
+    const before = this.terrain.heights.slice();
+    const after = next.slice();
+    const apply = (arr: Float32Array): void => {
+      this.terrain.heights.set(arr);
+      this.terrain.refresh();
+      this.reseatLayers();
+      this.onStateChange?.();
+    };
+    this.history.apply({ label: 'Import heightmap', redo: () => apply(after), undo: () => apply(before) });
+    this.setStatus('Heightmap applied — terrain reshaped.');
   }
 
   /** Load decoded terrain + state (from an imported/loaded map). */

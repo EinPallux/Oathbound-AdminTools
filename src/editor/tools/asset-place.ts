@@ -58,7 +58,7 @@ export const assetTool: Tool = new (class implements Tool {
     this.refreshPreview(editor);
     if (p && this.preview) {
       this.preview.visible = true;
-      this.preview.position.set(p.x, editor.terrain.heightAt(p.x, p.z) + previewYLift(editor.placement.asset, editor.placement.scale), p.z);
+      this.preview.position.set(p.x, editor.terrain.heightAt(p.x, p.z) + previewYLift(editor.placement.asset, editor.placement.scale) + editor.placement.y, p.z);
       this.preview.scale.setScalar(editor.placement.scale);
       editor.showBrush(p.x, p.z, editor.placement.scatterCount > 1 ? editor.placement.scatterRadius : editor.placement.scale);
     } else if (this.preview) {
@@ -113,6 +113,7 @@ export const assetTool: Tool = new (class implements Tool {
         scale: Math.max(0.05, pl.scale * jitter),
         rot: pl.jitterRot ? Math.random() * Math.PI * 2 : 0,
       };
+      if (pl.y) item.y = pl.y;
       editor.state.assets.push(item);
       this.count++;
     }
@@ -174,6 +175,11 @@ export const assetTool: Tool = new (class implements Tool {
       onInput: (v) => (editor.placement.scale = v),
       format: (v) => `${v.toFixed(2)}×`,
     });
+    const heightRow = slider('Height offset', {
+      min: -20, max: 40, step: 0.1, value: editor.placement.y,
+      onInput: (v) => (editor.placement.y = v),
+      format: (v) => `${v.toFixed(1)}m`,
+    });
     const countRow = slider('Scatter count', {
       min: 1, max: 40, step: 1, value: editor.placement.scatterCount,
       onInput: (v) => (editor.placement.scatterCount = v),
@@ -193,6 +199,7 @@ export const assetTool: Tool = new (class implements Tool {
     return section('Place Assets', [
       grid,
       scaleRow.row,
+      heightRow.row,
       checkbox('Random rotation', editor.placement.jitterRot, (v) => (editor.placement.jitterRot = v)),
       jitterRow.row,
       countRow.row,
