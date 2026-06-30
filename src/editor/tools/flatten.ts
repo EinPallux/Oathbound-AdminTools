@@ -1,22 +1,28 @@
-// Flatten brush: slowly eases sculpted terrain back toward the flat baseline (its original
-// state), for when the undo history is gone (e.g. you reopened the map). Unlike Sculpt's
-// "flatten" mode — which levels to the height under the cursor — this always pulls heights
-// toward a fixed base level (0 by default), raising sunken ground and lowering raised ground
-// back to flat. Records a sparse GridStroke so it's still undoable within the session.
+// Flatten brush — slowly eases terrain toward a target, a little per pass (undoable). Two modes:
+//   • To base level — pulls heights toward a fixed level (0 = original flat ground), raising
+//     sunken ground and lowering raised ground back to flat. Good for restoring sculpted areas
+//     when the undo history is gone (e.g. you reopened the map).
+//   • Normalize     — pulls heights toward the *brushed area's own average*, so it levels the
+//     spikes/roughness of a region without lowering its base elevation (a spiky mountain top
+//     becomes a flat plateau at its current height, instead of being demolished to 0).
+// (Sculpt's own "flatten" mode is different again: it levels to the height under the cursor.)
 
 import type { Tool } from '../tool';
 import type { Editor } from '../editor';
 import { GridStroke } from '../history';
 import { clamp } from '../../engine/math';
-import { el, section, slider } from '../ui/dom';
+import { el, section, slider, select } from '../ui/dom';
 
-const RESTORE_RATE = 0.3; // fraction of the gap to the base eased per application — a slow flatten
+type FlattenMode = 'base' | 'normalize';
+
+const RESTORE_RATE = 0.3; // fraction of the gap to the target eased per application — a slow flatten
 
 export const flattenTool: Tool = new (class implements Tool {
   readonly id = 'flatten';
   readonly label = 'Flatten';
   readonly icon = '⏥';
   readonly dragPaints = true;
+  mode: FlattenMode = 'base';
   baseLevel = 0;
 
   private stroke: GridStroke | null = null;
@@ -52,13 +58,17 @@ export const flattenTool: Tool = new (class implements Tool {
   }
 
   private apply(editor: Editor, x: number, z: number): void {
-    const { heights } = editor.terrain;
+    const terrain = editor.terrain;
+    const { heights } = terrain;
     const strength = editor.brush.strength;
-    const base = this.baseLevel;
-    editor.terrain.forEachCellInRadius(x, z, editor.brush.size, (idx, falloff) => {
+    const radius = editor.brush.size;
+    // 'base' eases toward a fixed level; 'normalize' eases toward the region's own mean
+    // height (recomputed live) so it levels spikes without changing the base elevation.
+    const target = this.mode === 'normalize' ? terrain.averageHeight(x, z, radius) : this.baseLevel;
+    terrain.forEachCellInRadius(x, z, radius, (idx, falloff) => {
       this.stroke?.record(idx);
       const w = clamp(falloff * strength * RESTORE_RATE, 0, 1);
-      heights[idx] += (base - heights[idx]) * w; // convex ease → never overshoots the base
+      heights[idx] += (target - heights[idx]) * w; // convex ease → never overshoots the target
     });
     editor.markTerrainDirty();
   }
@@ -79,11 +89,29 @@ export const flattenTool: Tool = new (class implements Tool {
       onInput: (v) => (this.baseLevel = v),
       format: (v) => `${v.toFixed(1)}m`,
     });
+    const hint = el('p', { class: 'hint' });
+    const refresh = (): void => {
+      baseRow.row.style.display = this.mode === 'base' ? '' : 'none';
+      hint.textContent = this.mode === 'normalize'
+        ? 'Left-drag to level the spikes/roughness of an area toward its own average height — flattens it without lowering its base elevation (e.g. smooth a jagged mountain top). Raise Strength to level faster.'
+        : 'Left-drag to ease terrain toward the base level (0 = original flat ground), a little per pass — handy for restoring sculpted areas when undo is gone. Raise Strength to flatten faster.';
+    };
+    const modeRow = select(
+      'Mode',
+      [
+        { value: 'base', label: 'To base level' },
+        { value: 'normalize', label: 'Normalize (level spikes)' },
+      ],
+      this.mode,
+      (v) => { this.mode = v as FlattenMode; refresh(); },
+    );
+    refresh();
     return section('Flatten Terrain', [
+      modeRow,
       sizeRow.row,
       strengthRow.row,
       baseRow.row,
-      el('p', { class: 'hint', text: 'Left-drag to ease terrain back toward the base level (0 = original flat ground). Restores sculpted areas a little per pass — handy when undo is gone. Raise Strength to flatten faster.' }),
+      hint,
     ]);
   }
 })();
