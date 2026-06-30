@@ -172,3 +172,6 @@ textarea { width: 100%; background: var(--panel); border: 1px solid var(--line);
 .mini-field span { font-size: 10px; color: var(--muted); }
 .btn-row { display: flex; gap: 6px; margin-top: 6px; }
 .btn-row .btn { flex: 1; }
+.req-list { display: flex; flex-direction: column; gap: 3px; padding: 4px 0 2px; }
+.req-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text); cursor: pointer; }
+.req-item input { margin: 0; }

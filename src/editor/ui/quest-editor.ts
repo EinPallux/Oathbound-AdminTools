@@ -126,6 +126,31 @@ export function openQuestEditor(editor: Editor): void {
     return wrap;
   }
 
+  /** Prerequisite picker — tick other quests that must be turned in before this one is offered. */
+  function requiresEditor(q: MapQuest): HTMLElement {
+    const others = s.quests.filter((o) => o.id !== q.id);
+    const wrap = el('label', { class: 'row col' }, [el('span', { class: 'row-label', text: 'Requires (prerequisite quests)' })]);
+    if (!others.length) {
+      wrap.append(el('p', { class: 'hint', text: 'Add more quests to chain them into a questline.' }));
+      return wrap;
+    }
+    const box = el('div', { class: 'req-list' });
+    for (const o of others) {
+      const line = el('label', { class: 'req-item' });
+      const cb = el('input', { type: 'checkbox' }) as HTMLInputElement;
+      cb.checked = (q.requires ?? []).includes(o.id);
+      cb.addEventListener('change', () => {
+        const set = new Set(q.requires ?? []);
+        if (cb.checked) set.add(o.id); else set.delete(o.id);
+        q.requires = set.size ? [...set] : undefined;
+      });
+      line.append(cb, el('span', { text: o.name || o.id }));
+      box.append(line);
+    }
+    wrap.append(box);
+    return wrap;
+  }
+
   function questCard(q: MapQuest, i: number): HTMLElement {
     const card = el('div', { class: 'quest-card' });
     const head = el('b', { text: q.name || '(unnamed quest)' });
@@ -136,6 +161,7 @@ export function openQuestEditor(editor: Editor): void {
       el('label', { class: 'row col' }, [el('span', { class: 'row-label', text: 'Description' }), textArea(q.description, (v) => (q.description = v), 2)]),
       select('Giver (accept)', npcOptions(), q.giver, (v) => (q.giver = v)),
       select('Turn-in (complete)', npcOptions(), q.turnIn, (v) => (q.turnIn = v)),
+      requiresEditor(q),
       objectiveEditor(q),
       el('div', { class: 'row two' }, [
         el('span', { class: 'row-label', text: 'Reward' }),
