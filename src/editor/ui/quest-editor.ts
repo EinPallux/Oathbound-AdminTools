@@ -183,27 +183,32 @@ export function openQuestEditor(editor: Editor): void {
   }
 
   function renderQuestCol(): void {
-    questCol.replaceChildren(
-      el('div', { class: 'parts-head' }, [
-        el('h3', { text: 'Quests' }),
-        button('+ Add quest', () => {
-          if (!s.npcs.length) { editor.setStatus('Place at least one NPC first.'); return; }
-          const npc0 = s.npcs[0].id!;
-          const base = slug('quest');
-          const used = new Set(s.quests.map((q) => q.id));
-          let id = base; let n = 1;
-          while (used.has(id)) id = `${base}-${++n}`;
-          const q: MapQuest = {
-            id, name: 'New Quest', description: '', giver: npc0, turnIn: npc0,
-            objective: { type: 'kill', enemyId: ENEMY_IDS[0], count: 5 },
-            reward: { gold: 25, xp: 50 },
-          };
-          s.quests.push(q);
-          renderQuestCol();
-        }),
-      ]),
-    );
-    if (!s.quests.length) questCol.append(el('p', { class: 'hint', text: 'No quests yet. Add one and attach it to a giver + turn-in NPC.' }));
+    const hasNpcs = s.npcs.length > 0;
+    const addBtn = button('+ Add quest', () => {
+      if (!s.npcs.length) return; // guarded below by disabling the button
+      const npc0 = s.npcs[0].id!;
+      const base = slug('quest');
+      const used = new Set(s.quests.map((q) => q.id));
+      let id = base; let n = 1;
+      while (used.has(id)) id = `${base}-${++n}`;
+      const q: MapQuest = {
+        id, name: 'New Quest', description: '', giver: npc0, turnIn: npc0,
+        objective: { type: 'kill', enemyId: ENEMY_IDS[0], count: 5 },
+        reward: { gold: 25, xp: 50 },
+      };
+      s.quests.push(q);
+      renderQuestCol();
+    });
+    // Quests are given out / turned in by NPCs, so at least one NPC must exist first.
+    addBtn.disabled = !hasNpcs;
+    if (!hasNpcs) addBtn.title = 'Place at least one NPC first (NPCs tool)';
+    questCol.replaceChildren(el('div', { class: 'parts-head' }, [el('h3', { text: 'Quests' }), addBtn]));
+
+    if (!hasNpcs) {
+      questCol.append(el('p', { class: 'hint warn', text: '⚠ Add an NPC first. Quests are given out and turned in by NPCs — place at least one with the NPCs tool, then add quests here.' }));
+    } else if (!s.quests.length) {
+      questCol.append(el('p', { class: 'hint', text: 'No quests yet. Click “+ Add quest”, then attach it to a giver + turn-in NPC.' }));
+    }
     s.quests.forEach((q, i) => questCol.append(questCard(q, i)));
   }
 

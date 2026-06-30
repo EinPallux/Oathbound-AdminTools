@@ -74,6 +74,7 @@ button.btn, .tool-btn { font: inherit; cursor: pointer; }
 .section { margin-bottom: 16px; }
 .section h3 { margin: 0 0 9px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
 .hint { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 8px 0 0; }
+.hint.warn { color: #ffd98a; background: rgba(120, 90, 20, 0.18); border: 1px solid #5a4a1e; border-radius: 7px; padding: 8px 10px; }
 
 .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; font-size: 13px; }
 .row-label { flex: 0 0 92px; color: var(--muted); }
