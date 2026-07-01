@@ -33,25 +33,17 @@ const PALETTE = {
   jungleHigh: new THREE.Color(0x386030),
   ice: new THREE.Color(0xb9d4e6),
   basalt: new THREE.Color(0x2c2c31),
+  mountainLow: new THREE.Color(0x5b554e),
+  mountainHigh: new THREE.Color(0x877f73),
 };
 
-/**
- * Deterministic per-slab brightness for paved ground (city / cobblestone): each `tile`-metre
- * slab gets a steady shade, with a darker seam between slabs — reads as flagstones/paving at
- * the terrain mesh's vertex resolution (which is too coarse for fine cobbles).
- */
-function paveShade(wx: number, wz: number, tile: number): number {
-  const tx = Math.floor(wx / tile);
-  const tz = Math.floor(wz / tile);
-  const fx = wx / tile - tx;
-  const fz = wz / tile - tz;
-  const edge = Math.min(fx, 1 - fx, fz, 1 - fz);
-  let h = (tx * 374761393 + tz * 668265263) | 0;
+/** Deterministic 0..1 mottle for craggy rock — quantised so it reads as rocky texture. */
+function rockNoise(wx: number, wz: number): number {
+  const qx = Math.floor(wx / 1.5);
+  const qz = Math.floor(wz / 1.5);
+  let h = (qx * 374761393 + qz * 668265263) | 0;
   h = ((h ^ (h >>> 13)) * 1274126177) | 0;
-  const rnd = ((h >>> 0) % 1000) / 1000;
-  let s = 0.84 + rnd * 0.3; // 0.84 .. 1.14 slab-to-slab
-  if (edge < 0.07) s *= 0.62; // darker seam/grout between slabs
-  return s;
+  return ((h >>> 0) % 1000) / 1000;
 }
 
 /** Terrain colour for a painted ground index at world (wx, wz) + height, written into `out`. */
@@ -64,7 +56,7 @@ export function colorForBiome(biome: number, h: number, wx: number, wz: number, 
     case 4: { const sn = clamp((h - 24) / 22, 0, 1); return out.copy(PALETTE.rivenRock).lerp(PALETTE.snow, sn); }
     case 5: return out.copy(PALETTE.grave);
     case 6: return out.copy(PALETTE.hub);
-    case 7: return out.copy(PALETTE.city).multiplyScalar(paveShade(wx, wz, 12));  // City — paved stone
+    case 7: return out.copy(PALETTE.city);   // City — paved stone (fine paving is a texture overlay)
     case 8: return out.copy(PALETTE.desert);                                       // Desert sand
     case 9: { const band = Math.sin(h * 0.8) * 0.5 + 0.5; return out.copy(PALETTE.mesaLow).lerp(PALETTE.mesaHigh, band); } // Mesa — red strata
     case 10: return out.copy(PALETTE.savanna);                                     // Savanna
@@ -72,11 +64,16 @@ export function colorForBiome(biome: number, h: number, wx: number, wz: number, 
     case 12: return out.copy(PALETTE.dirt);                                        // Dirt
     case 13: return out.copy(PALETTE.sand);                                        // Beach sand
     case 14: return out.copy(PALETTE.mud);                                         // Mud
-    case 15: return out.copy(PALETTE.cobble).multiplyScalar(paveShade(wx, wz, 7)); // Cobblestone road
+    case 15: return out.copy(PALETTE.cobble);                                      // Cobblestone (paving overlay on top)
     case 16: return out.copy(PALETTE.ash);                                         // Ash / wasteland
     case 17: return out.copy(PALETTE.jungleLow).lerp(PALETTE.jungleHigh, t * 0.5); // Jungle
     case 18: return out.copy(PALETTE.ice);                                         // Ice
     case 19: return out.copy(PALETTE.basalt);                                      // Basalt
+    case 20: { // Mountains — craggy grey-brown rock with a snow cap on the peaks
+      const sn = clamp((h - 26) / 20, 0, 1);
+      const n = rockNoise(wx, wz) * 0.14 - 0.07;
+      return out.copy(PALETTE.mountainLow).lerp(PALETTE.mountainHigh, clamp(h / 40, 0, 1)).addScalar(n).lerp(PALETTE.snow, sn);
+    }
     default: return out.copy(PALETTE.greenLow).lerp(PALETTE.greenHigh, t);         // 0 — grass
   }
 }

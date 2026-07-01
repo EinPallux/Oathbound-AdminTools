@@ -6,9 +6,23 @@
 import * as THREE from 'three';
 import { clamp } from './math';
 import { colorForBiome } from '../oathbound/palette';
+import { pavedSurfaceGeometry } from '../format/map';
+import { makePavingTexture } from './paving';
 
 /** Sculpt brush footprint + edge profile. Hard-edged shapes build vertical cliffs. */
 export type BrushShape = 'circle' | 'square' | 'pillar' | 'mesa';
+
+// Shared paving material (city / cobblestone overlay). Lazy so tests without a DOM are fine.
+let _pavingMat: THREE.Material | null = null;
+function pavingMaterial(): THREE.Material {
+  if (!_pavingMat) {
+    _pavingMat = new THREE.MeshLambertMaterial({
+      map: makePavingTexture(), vertexColors: true,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
+  }
+  return _pavingMat;
+}
 
 export class EditorTerrain {
   readonly size: number;
@@ -20,6 +34,8 @@ export class EditorTerrain {
   /** Painted water-surface height per cell; NaN = dry (no water). Parallel to heights. */
   water: Float32Array;
   readonly mesh: THREE.Mesh;
+  /** Paved-ground (City/Cobblestone) texture overlay, a child of the terrain mesh. */
+  private readonly paving: THREE.Mesh;
   private readonly geo: THREE.BufferGeometry;
   private dirty = false;
 
@@ -42,8 +58,26 @@ export class EditorTerrain {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.mesh = new THREE.Mesh(this.geo, mat);
     this.mesh.name = 'terrain';
+
+    this.paving = new THREE.Mesh(new THREE.BufferGeometry(), pavingMaterial());
+    this.paving.name = 'paving';
+    this.paving.frustumCulled = false;
+    this.mesh.add(this.paving);
+
     this.rebuildXZ();
     this.refresh();
+  }
+
+  /** Rebuild the City/Cobblestone paving overlay from the current ground + heights. */
+  private rebuildPaving(): void {
+    const { positions, uvs, colors, indices } = pavedSurfaceGeometry(this.biomes, this.heights, this.res, this.size);
+    const g = this.paving.geometry;
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    g.setIndex(indices);
+    g.computeVertexNormals();
+    this.paving.visible = positions.length > 0;
   }
 
   private buildIndex(): THREE.BufferAttribute {
@@ -120,6 +154,7 @@ export class EditorTerrain {
     nrm.needsUpdate = true;
     col.needsUpdate = true;
     this.geo.computeBoundingSphere();
+    this.rebuildPaving();
     this.dirty = false;
   }
 
@@ -247,5 +282,6 @@ export class EditorTerrain {
   dispose(): void {
     this.geo.dispose();
     (this.mesh.material as THREE.Material).dispose();
+    this.paving.geometry.dispose(); // shared material is reused across terrains
   }
 }

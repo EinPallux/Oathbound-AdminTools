@@ -21,6 +21,7 @@ const GROUND_OPTIONS: { value: number; label: string }[] = [
   { value: 14, label: 'Mud' },
   { value: 2, label: 'Marsh / bog' },
   { value: 9, label: 'Mesa (red rock)' },
+  { value: 20, label: 'Mountains (rocky)' },
   { value: 4, label: 'Rocky / snow peaks' },
   { value: 11, label: 'Tundra' },
   { value: 18, label: 'Ice' },
