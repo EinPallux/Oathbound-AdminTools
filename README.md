@@ -53,7 +53,7 @@ A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terra
 
 **Fog toggle** (top bar): distance fog is **off by default** so giant maps stay fully visible while you edit; flip it on for an atmospheric preview of how the world reads at range.
 
-**Terrain: Smooth ⇄ Cubic** (top bar): preview the terrain as fine stepped cubes — a **Cube World / Trove** look — while you author, with the City/Cobblestone stone texture laid on the cube tops. In the editor this is **preview-only**: sculpting, painting and the exported `oathbound-map.json` are unchanged (the smooth terrain is just hidden behind the cubic preview), and big maps preview a little coarser than they render in-game. The game has the matching toggle in **Settings → Graphics → "Voxel terrain"** (or `?voxel=1`), where it renders a fine cube bubble around the player and you **walk on the cube tops** (real collision).
+**Terrain: Smooth ⇄ Cubic** (top bar): preview the terrain as fine stepped cubes — a **Cube World / Trove** look — while you author, with the City/Cobblestone stone texture laid on the cube tops. In the editor this is **preview-only**: sculpting, painting and the exported `oathbound-map.json` are unchanged (the smooth terrain is just hidden behind the cubic preview), and big maps preview a little coarser than they render in-game. Toggle back to **Smooth** whenever the flat surface is easier to edit on. The **game always renders in Cube World style** (fine cube bubble around the player, real cube collision) — there's no in-game switch; this editor toggle is just for authoring.
 
 ## Maps
 
