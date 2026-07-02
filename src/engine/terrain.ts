@@ -40,8 +40,8 @@ export class EditorTerrain {
   private readonly voxelMesh: THREE.Mesh;
   /** Render the terrain as stepped cubes (Cube World look). Visual only — export is unchanged. */
   voxel = false;
-  /** Vertical quantization (m) for the voxel terrain. */
-  voxelStep = 3;
+  /** Vertical quantization (m) for the voxel terrain (matches the game's default). */
+  voxelStep = 2;
   /** Paved-ground (City/Cobblestone) texture overlay, a child of the terrain mesh. */
   private readonly paving: THREE.Mesh;
   private readonly geo: THREE.BufferGeometry;
@@ -70,11 +70,11 @@ export class EditorTerrain {
     this.paving = new THREE.Mesh(new THREE.BufferGeometry(), pavingMaterial());
     this.paving.name = 'paving';
     this.paving.frustumCulled = false;
-    this.mesh.add(this.paving);
 
     // Voxel terrain sits beside the smooth mesh in a wrapper group; visibility toggles between
     // them. The smooth mesh stays present (hidden) even in voxel mode so tools keep raycasting it.
-    this.voxelMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true }));
+    // The paving overlay is a group child (not under the smooth mesh) so it shows in both modes.
+    this.voxelMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
     this.voxelMesh.name = 'terrain-voxel';
     this.voxelMesh.frustumCulled = false;
     this.voxelMesh.visible = false;
@@ -82,6 +82,7 @@ export class EditorTerrain {
     this.group.name = 'terrain-group';
     this.group.add(this.mesh);
     this.group.add(this.voxelMesh);
+    this.group.add(this.paving);
 
     this.rebuildXZ();
     this.refresh();
@@ -89,7 +90,9 @@ export class EditorTerrain {
 
   /** Rebuild the voxel/Cube-World terrain from the current heights + ground. */
   private rebuildVoxel(): void {
-    const cells = Math.min(this.res - 1, 240);
+    // Cap the cube count for perf on huge maps; finer than the game's near-field is impractical
+    // to draw whole-map, so big maps (e.g. Talar) preview a little coarser than they look in-game.
+    const cells = Math.min(this.res - 1, 400);
     const c = new THREE.Color();
     const { positions, normals, colors, indices } = cubicTerrainGeometry(
       this.size, cells, this.voxelStep,
@@ -122,7 +125,12 @@ export class EditorTerrain {
 
   /** Rebuild the City/Cobblestone paving overlay from the current ground + heights. */
   private rebuildPaving(): void {
-    const { positions, uvs, colors, indices } = pavedSurfaceGeometry(this.biomes, this.heights, this.res, this.size);
+    // In voxel mode lay the paving on the quantized cube tops so City/Cobblestone show the stone
+    // texture instead of flat grey; otherwise it follows the smooth surface.
+    const hAt = this.voxel && this.voxelStep > 0
+      ? (x: number, z: number): number => Math.round(this.heightAt(x, z) / this.voxelStep) * this.voxelStep
+      : undefined;
+    const { positions, uvs, colors, indices } = pavedSurfaceGeometry(this.biomes, this.heights, this.res, this.size, hAt);
     const g = this.paving.geometry;
     g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
