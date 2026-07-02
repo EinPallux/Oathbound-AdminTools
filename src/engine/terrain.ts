@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { clamp } from './math';
 import { colorForBiome } from '../oathbound/palette';
-import { pavedSurfaceGeometry } from '../format/map';
+import { pavedSurfaceGeometry, cubicTerrainGeometry } from '../format/map';
 import { makePavingTexture } from './paving';
 
 /** Sculpt brush footprint + edge profile. Hard-edged shapes build vertical cliffs. */
@@ -34,6 +34,14 @@ export class EditorTerrain {
   /** Painted water-surface height per cell; NaN = dry (no water). Parallel to heights. */
   water: Float32Array;
   readonly mesh: THREE.Mesh;
+  /** Wrapper holding the smooth mesh + the voxel mesh; add THIS to the scene, not `mesh`. */
+  readonly group: THREE.Group;
+  /** Voxel / "Cube World" terrain, shown instead of the smooth mesh when `voxel` is on. */
+  private readonly voxelMesh: THREE.Mesh;
+  /** Render the terrain as stepped cubes (Cube World look). Visual only — export is unchanged. */
+  voxel = false;
+  /** Vertical quantization (m) for the voxel terrain. */
+  voxelStep = 3;
   /** Paved-ground (City/Cobblestone) texture overlay, a child of the terrain mesh. */
   private readonly paving: THREE.Mesh;
   private readonly geo: THREE.BufferGeometry;
@@ -64,8 +72,52 @@ export class EditorTerrain {
     this.paving.frustumCulled = false;
     this.mesh.add(this.paving);
 
+    // Voxel terrain sits beside the smooth mesh in a wrapper group; visibility toggles between
+    // them. The smooth mesh stays present (hidden) even in voxel mode so tools keep raycasting it.
+    this.voxelMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true }));
+    this.voxelMesh.name = 'terrain-voxel';
+    this.voxelMesh.frustumCulled = false;
+    this.voxelMesh.visible = false;
+    this.group = new THREE.Group();
+    this.group.name = 'terrain-group';
+    this.group.add(this.mesh);
+    this.group.add(this.voxelMesh);
+
     this.rebuildXZ();
     this.refresh();
+  }
+
+  /** Rebuild the voxel/Cube-World terrain from the current heights + ground. */
+  private rebuildVoxel(): void {
+    const cells = Math.min(this.res - 1, 240);
+    const c = new THREE.Color();
+    const { positions, normals, colors, indices } = cubicTerrainGeometry(
+      this.size, cells, this.voxelStep,
+      (x, z) => this.heightAt(x, z),
+      (x, z, h, out) => {
+        colorForBiome(this.biomeAt(x, z), h, x, z, c);
+        out[0] = c.r; out[1] = c.g; out[2] = c.b;
+      },
+    );
+    const g = this.voxelMesh.geometry;
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    g.setIndex(new THREE.BufferAttribute(indices, 1));
+    g.computeBoundingSphere();
+  }
+
+  /** Toggle stepped-cube (Cube World) terrain rendering. */
+  setVoxel(on: boolean): void {
+    if (this.voxel === on) return;
+    this.voxel = on;
+    this.refresh();
+  }
+
+  /** Set the voxel vertical step (m) and rebuild if voxel terrain is showing. */
+  setVoxelStep(step: number): void {
+    this.voxelStep = step;
+    if (this.voxel) this.rebuildVoxel();
   }
 
   /** Rebuild the City/Cobblestone paving overlay from the current ground + heights. */
@@ -155,6 +207,10 @@ export class EditorTerrain {
     col.needsUpdate = true;
     this.geo.computeBoundingSphere();
     this.rebuildPaving();
+    // Smooth mesh stays raycastable (tools pick against it) but is hidden in voxel mode.
+    this.mesh.visible = !this.voxel;
+    this.voxelMesh.visible = this.voxel;
+    if (this.voxel) this.rebuildVoxel();
     this.dirty = false;
   }
 
@@ -283,5 +339,7 @@ export class EditorTerrain {
     this.geo.dispose();
     (this.mesh.material as THREE.Material).dispose();
     this.paving.geometry.dispose(); // shared material is reused across terrains
+    this.voxelMesh.geometry.dispose();
+    (this.voxelMesh.material as THREE.Material).dispose();
   }
 }

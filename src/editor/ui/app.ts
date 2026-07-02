@@ -57,6 +57,15 @@ export class EditorUI {
     });
     fogBtn.title = 'Toggle distance fog — turn on for an atmospheric look, off to see across giant maps';
 
+    // Cube-World terrain preview (render-only: collision + the exported map are unchanged).
+    const voxelBtn = button('Terrain: Smooth', () => {
+      const on = !this.editor.terrain.voxel;
+      this.editor.terrain.setVoxel(on);
+      voxelBtn.textContent = on ? 'Terrain: Cubic' : 'Terrain: Smooth';
+      voxelBtn.classList.toggle('active', on);
+    });
+    voxelBtn.title = 'Toggle stepped-cube (Cube World) terrain — a visual preview only; the map you export is unchanged';
+
     topbar.append(
       el('span', { class: 'brand', text: '⚒ Oathbound Map Builder' }),
       this.nameLabel,
@@ -64,6 +73,7 @@ export class EditorUI {
       this.undoBtn,
       this.redoBtn,
       fogBtn,
+      voxelBtn,
       button('New', () => this.openNewMap()),
       button('Resize', () => this.openResize()),
       button('Heightmap', () => this.openHeightmap()),

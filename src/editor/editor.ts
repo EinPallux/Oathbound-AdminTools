@@ -90,7 +90,7 @@ export class Editor {
     this.viewport.controls.screenSpacePanning = true;
 
     this.viewport.scene.add(this.worldGroup);
-    this.worldGroup.add(this.terrain.mesh);
+    this.worldGroup.add(this.terrain.group);
     this.worldGroup.add(this.waterLayer.group);
     this.worldGroup.add(this.assetLayer.group);
     this.worldGroup.add(this.markerLayer.group);
@@ -459,9 +459,11 @@ export class Editor {
   }
 
   private swapTerrain(next: EditorTerrain): void {
-    this.worldGroup.remove(this.terrain.mesh);
+    next.voxelStep = this.terrain.voxelStep;
+    next.setVoxel(this.terrain.voxel); // carry the Cube-World toggle across map load/resize
+    this.worldGroup.remove(this.terrain.group);
     this.terrain.dispose();
     this.terrain = next;
-    this.worldGroup.add(this.terrain.mesh);
+    this.worldGroup.add(this.terrain.group);
   }
 }

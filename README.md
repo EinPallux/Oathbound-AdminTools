@@ -53,6 +53,8 @@ A WYSIWYG editor that renders with Oathbound's **exact** prop geometry and terra
 
 **Fog toggle** (top bar): distance fog is **off by default** so giant maps stay fully visible while you edit; flip it on for an atmospheric preview of how the world reads at range.
 
+**Terrain: Smooth ⇄ Cubic** (top bar): preview the terrain as stepped cubes — a **Cube World / Trove** look — while you author. This is **render-only**: sculpting, painting, collision and the exported `oathbound-map.json` are all unchanged (the smooth terrain is just hidden behind the cubic preview). The game has the matching toggle in **Settings → Graphics → "Voxel terrain"** (or `?voxel=1`).
+
 ## Maps
 
 - **Save / Load** keep named maps in this browser's `localStorage`; the editor also autosaves your last session.
