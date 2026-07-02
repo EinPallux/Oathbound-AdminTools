@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { EditorTerrain } from './terrain';
 import type { EditorState } from '../editor/state';
 import type { CritterType } from '../format/map';
-import { buildPlayerModel } from '../oathbound/player-model';
+import { buildPlayerModel, PLAYER_MODEL_HEIGHT } from '../oathbound/player-model';
 
 export type MarkerType = 'spawn' | 'boss' | 'oathstone' | 'player' | 'village' | 'npc' | 'critter';
 export interface MarkerRef {
@@ -177,8 +177,8 @@ export class MarkerLayer {
       const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 28).rotateX(-Math.PI / 2), PLAYER_MAT);
       ring.position.y = 0.03;
       g.add(ring);
-      const label = labelSprite('▶ Player Spawn · ~2.4m (1:1)', '#d2ffe0');
-      label.position.y = 3.0;
+      const label = labelSprite(`▶ Player Spawn · ~${PLAYER_MODEL_HEIGHT.toFixed(1)}m (1:1)`, '#d2ffe0');
+      label.position.y = PLAYER_MODEL_HEIGHT + 0.6;
       g.add(label);
       g.position.set(p.x, terrain.heightAt(p.x, p.z), p.z);
       this.add(g, { type: 'player', index: 0 });

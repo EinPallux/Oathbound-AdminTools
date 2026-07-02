@@ -1,81 +1,169 @@
 // A faithful, static copy of the game's player avatar (src/render/player-view.ts, warrior
 // look) so the Player Spawn marker shows the real model at true 1:1 in-game scale — a
 // reference for how big to make/scale assets. Feet sit at y=0 (the game seats the model at
-// terrain height; FEET = PLAYER_HALF = 0.9). Materials are shared module-level so marker
-// rebuilds (which dispose child geometry) don't leak.
+// terrain height; FEET = PLAYER_HALF = 0.9). The whole figure is uniformly scaled by
+// MODEL_SCALE, matching the game. Materials are memoised per colour so marker rebuilds
+// (which dispose child geometry) don't leak.
 
 import * as THREE from 'three';
 
-const SKIN = 0xd9a878;
-function mat(color: number, rough = 0.75): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.05 });
-}
-const MAT = {
-  torso: mat(0x4a5670),
-  limb: mat(0x39435a),
-  head: mat(SKIN),
-  eye: mat(0x2a2a30),
-  grip: mat(0x5a3a1e),
-  guard: mat(0xc2c6cd, 0.4),
-  blade: mat(0xd6dbe2, 0.3),
-  shield: mat(0x8a3b3b, 0.6),
-  boss: mat(0xc2c6cd, 0.3),
-};
+/** Uniform visual scale of the avatar (mirrors MODEL_SCALE in the game's player-view.ts). */
+const MODEL_SCALE = 1.22;
+/** Weapon rest tilt (~65° above the ground) + shield side-tilt — mirror the game. */
+const HOLD_ANGLE = ((90 - 65) * Math.PI) / 180;
+const SHIELD_ANGLE = (50 * Math.PI) / 180;
 
-function box(w: number, h: number, d: number, m: THREE.Material): THREE.Mesh {
-  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+const SKIN = 0xd9a878;
+const HAIR = 0x6b4526;
+const BROW = 0x4a3018;
+
+const MATS = new Map<string, THREE.MeshStandardMaterial>();
+function mat(color: number, rough = 0.75): THREE.MeshStandardMaterial {
+  const key = `${color}|${rough}`;
+  let m = MATS.get(key);
+  if (!m) {
+    m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.05 });
+    MATS.set(key, m);
+  }
+  return m;
 }
-/** A pivot group at a joint with a chunky limb box hanging below it. */
-function limb(x: number, y: number, w: number, h: number, d: number, m: THREE.Material): THREE.Group {
+
+/** Create a box at (x,y,z) in `parent`'s local space, add it, and return it (for rotation). */
+function put(
+  parent: THREE.Object3D,
+  w: number, h: number, d: number, color: number,
+  x: number, y: number, z: number, rough = 0.75,
+): THREE.Mesh {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, rough));
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
+
+function joint(x: number, y: number): THREE.Group {
   const g = new THREE.Group();
   g.position.set(x, y, 0);
-  const b = box(w, h, d, m);
-  b.position.y = -h / 2;
-  g.add(b);
   return g;
 }
 
-/** Build the static warrior avatar (feet at y=0, ~2.4 m to the top of the head). */
+/** Build the static warrior avatar (feet at y=0, ~2.95 m to the top of the head at MODEL_SCALE). */
 export function buildPlayerModel(): THREE.Group {
   const group = new THREE.Group();
   group.name = 'player-ref';
+  group.scale.setScalar(MODEL_SCALE);
 
-  const torso = box(0.86, 0.95, 0.5, MAT.torso);
-  torso.position.y = 1.42;
-  const head = box(0.66, 0.64, 0.62, MAT.head);
-  head.position.y = 2.06;
-  const eyeL = box(0.1, 0.12, 0.04, MAT.eye);
-  eyeL.position.set(0.15, 2.08, 0.32);
-  const eyeR = box(0.1, 0.12, 0.04, MAT.eye);
-  eyeR.position.set(-0.15, 2.08, 0.32);
-  group.add(torso, head, eyeL, eyeR);
+  const b = new THREE.Group();
+  group.add(b);
+  const armL = joint(0.56, 1.82); b.add(armL);
+  const armR = joint(-0.56, 1.82); b.add(armR);
+  const legL = joint(0.24, 0.92); group.add(legL);
+  const legR = joint(-0.24, 0.92); group.add(legR);
 
-  const armL = limb(0.56, 1.82, 0.26, 0.84, 0.32, MAT.limb);
-  const armR = limb(-0.56, 1.82, 0.26, 0.84, 0.32, MAT.limb);
-  group.add(armL, armR);
-  group.add(limb(0.22, 0.92, 0.32, 0.86, 0.36, MAT.limb), limb(-0.22, 0.92, 0.32, 0.86, 0.36, MAT.limb));
+  const STEEL = 0x969ca6, STEEL_DK = 0x6c727c, STEEL_LT = 0xb6bcc4;
+  const NAVY = 0x2c3346, NAVY_DK = 0x232838;
+  const RED = 0x8f3a34, LEATHER = 0x5a3a1e, LEATHER_DK = 0x3f2814;
+  const GOLD = 0xc9a94e, BLADE = 0xd6dbe2, SHIELD = 0x2f3e63;
 
-  // Warrior sword in the right hand (rest pose).
+  // Face (skin + brows + eyes + mouth).
+  put(b, 0.62, 0.58, 0.58, SKIN, 0, 2.04, 0);
+  put(b, 0.16, 0.05, 0.04, BROW, 0.15, 2.15, 0.30);
+  put(b, 0.16, 0.05, 0.04, BROW, -0.15, 2.15, 0.30);
+  put(b, 0.09, 0.11, 0.04, 0xffffff, 0.15, 2.04, 0.30, 0.4);
+  put(b, 0.09, 0.11, 0.04, 0xffffff, -0.15, 2.04, 0.30, 0.4);
+  put(b, 0.07, 0.09, 0.05, 0x2f5fa0, 0.15, 2.03, 0.31, 0.35);
+  put(b, 0.07, 0.09, 0.05, 0x2f5fa0, -0.15, 2.03, 0.31, 0.35);
+  put(b, 0.16, 0.05, 0.04, 0x9c6b45, 0, 1.86, 0.30);
+
+  // Tufty hair.
+  put(b, 0.7, 0.24, 0.66, HAIR, 0, 2.36, 0);
+  put(b, 0.62, 0.16, 0.12, HAIR, 0, 2.28, 0.28);
+  put(b, 0.12, 0.42, 0.5, HAIR, 0.33, 2.12, -0.02);
+  put(b, 0.12, 0.42, 0.5, HAIR, -0.33, 2.12, -0.02);
+  put(b, 0.66, 0.3, 0.14, HAIR, 0, 2.22, -0.3);
+  for (const [hx, hz] of [[-0.2, 0.1], [0.05, 0.16], [0.24, 0.02], [-0.28, -0.05]] as const)
+    put(b, 0.18, 0.14, 0.18, HAIR, hx, 2.5, hz);
+
+  // Red scarf at the collar.
+  put(b, 0.56, 0.2, 0.18, RED, 0, 1.68, 0.2);
+  put(b, 0.2, 0.26, 0.46, RED, 0.24, 1.7, 0);
+  put(b, 0.2, 0.26, 0.46, RED, -0.24, 1.7, 0);
+  put(b, 0.5, 0.28, 0.16, RED, 0, 1.64, -0.22);
+
+  // Torso: navy gambeson + steel plate + baldric + belt.
+  put(b, 0.8, 0.92, 0.46, NAVY, 0, 1.42, 0);
+  put(b, 0.74, 0.54, 0.5, STEEL, 0, 1.58, 0.02);
+  put(b, 0.16, 0.5, 0.52, STEEL_LT, 0, 1.58, 0.03);
+  put(b, 0.74, 0.06, 0.5, GOLD, 0, 1.32, 0.02);
+  put(b, 0.12, 1.12, 0.05, LEATHER, 0, 1.46, 0.26).rotation.z = -0.6;
+  put(b, 0.86, 0.16, 0.5, LEATHER, 0, 1.0, 0);
+  put(b, 0.2, 0.18, 0.06, GOLD, 0, 1.0, 0.25);
+
+  // Steel pauldrons with gold trim.
+  for (const s of [1, -1]) {
+    put(b, 0.42, 0.3, 0.46, STEEL, 0.56 * s, 1.86, 0);
+    put(b, 0.44, 0.14, 0.48, STEEL_DK, 0.56 * s, 1.98, 0);
+    put(b, 0.44, 0.05, 0.49, GOLD, 0.56 * s, 1.77, 0);
+  }
+
+  // Arms.
+  for (const arm of [armL, armR]) {
+    put(arm, 0.28, 0.42, 0.32, NAVY_DK, 0, -0.22, 0);
+    put(arm, 0.3, 0.34, 0.34, LEATHER, 0, -0.58, 0);
+    put(arm, 0.31, 0.05, 0.35, GOLD, 0, -0.42, 0);
+    put(arm, 0.26, 0.2, 0.3, STEEL, 0, -0.84, 0);
+  }
+
+  // Legs.
+  for (const leg of [legL, legR]) {
+    put(leg, 0.34, 0.46, 0.38, NAVY, 0, -0.24, 0);
+    put(leg, 0.36, 0.16, 0.4, STEEL, 0, -0.5, 0.02);
+    put(leg, 0.36, 0.05, 0.41, GOLD, 0, -0.42, 0.03);
+    put(leg, 0.32, 0.24, 0.36, NAVY_DK, 0, -0.68, 0);
+    put(leg, 0.36, 0.2, 0.4, LEATHER, 0, -0.84, 0.04);
+    put(leg, 0.36, 0.14, 0.18, LEATHER_DK, 0, -0.88, 0.24);
+  }
+
+  // Red tabard.
+  put(group, 0.42, 0.82, 0.08, RED, 0, 0.56, 0.25);
+  put(group, 0.3, 0.2, 0.08, RED, 0, 0.18, 0.25);
+  put(group, 0.44, 0.06, 0.09, GOLD, 0, 0.94, 0.25);
+
+  // Sword slung across the back.
+  const back = new THREE.Group();
+  back.position.set(0.05, 1.45, -0.32);
+  back.rotation.set(0.12, 0, -0.7);
+  put(back, 0.15, 1.3, 0.11, LEATHER_DK, 0, 0, 0);
+  put(back, 0.36, 0.09, 0.13, GOLD, 0, 0.62, 0);
+  put(back, 0.08, 0.24, 0.09, LEATHER, 0, 0.75, 0);
+  put(back, 0.13, 0.13, 0.13, GOLD, 0, 0.9, 0);
+  b.add(back);
+
+  // Bigger sword in the right hand, held at a forward angle.
   const sword = new THREE.Group();
-  const grip = box(0.08, 0.26, 0.08, MAT.grip);
-  const guard = box(0.36, 0.09, 0.12, MAT.guard);
-  guard.position.y = 0.16;
-  const blade = box(0.13, 0.98, 0.06, MAT.blade);
-  blade.position.y = 0.7;
-  sword.add(grip, guard, blade);
-  sword.position.set(0, -0.84, 0.12);
-  sword.rotation.set(Math.PI / 4, 0, 0.22);
+  sword.position.set(0, -0.84, 0.16);
+  sword.rotation.x = -HOLD_ANGLE;
+  put(sword, 0.15, 0.15, 0.15, GOLD, 0, 0.18, 0);
+  put(sword, 0.1, 0.3, 0.1, LEATHER, 0, 0, 0);
+  put(sword, 0.5, 0.14, 0.15, GOLD, 0, -0.2, 0);
+  put(sword, 0.2, 0.82, 0.07, BLADE, 0, -0.63, 0, 0.3);
+  put(sword, 0.14, 0.22, 0.07, BLADE, 0, -1.14, 0, 0.3);
   armR.add(sword);
 
-  // Shield on the left forearm.
-  const shield = box(0.56, 0.66, 0.12, MAT.shield);
-  shield.position.set(0, -0.5, 0.2);
-  const boss = box(0.16, 0.16, 0.06, MAT.boss);
-  boss.position.set(0, -0.5, 0.27);
-  armL.add(shield, boss);
+  // Bigger kite shield on the left forearm, angled out to the side.
+  const shield = new THREE.Group();
+  shield.position.set(0.14, -0.5, 0.2);
+  shield.rotation.y = SHIELD_ANGLE;
+  put(shield, 0.84, 1.3, 0.07, GOLD, 0, 0.02, -0.02);
+  put(shield, 0.74, 0.64, 0.09, SHIELD, 0, 0.28, 0.02);
+  put(shield, 0.64, 0.5, 0.09, SHIELD, 0, -0.22, 0.02);
+  put(shield, 0.4, 0.42, 0.09, SHIELD, 0, -0.66, 0.02);
+  put(shield, 0.2, 0.56, 0.05, GOLD, 0, 0.02, 0.09);
+  put(shield, 0.3, 0.3, 0.05, GOLD, 0, 0.02, 0.09).rotation.z = Math.PI / 4;
+  put(shield, 0.15, 0.15, 0.06, SHIELD, 0, 0.02, 0.12).rotation.z = Math.PI / 4;
+  armL.add(shield);
 
   return group;
 }
 
-/** Top-of-head height (m) — handy for placing a label above the reference model. */
-export const PLAYER_MODEL_HEIGHT = 2.4;
+/** Top-of-head height (m) at MODEL_SCALE — handy for placing a label above the reference model. */
+export const PLAYER_MODEL_HEIGHT = 2.95;
