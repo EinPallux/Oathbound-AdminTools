@@ -172,6 +172,14 @@ export class Editor {
 
   private frame(_dt: number): void {
     this.terrain.flush();
+    // Keep the Cube-World preview bubble centred on where the camera looks, sized to the zoom so
+    // it fills the view; updateVoxel is a cheap no-op until the focus drifts far enough to rebuild.
+    if (this.terrain.voxel) {
+      const t = this.viewport.controls.target;
+      const dist = this.viewport.camera.position.distanceTo(t);
+      const radius = Math.round(Math.min(600, Math.max(160, dist * 1.2)) / 40) * 40;
+      this.terrain.updateVoxel(t.x, t.z, radius);
+    }
     if (this.assetsDirty) {
       this.assetLayer.rebuild(this.state.assets, this.state.customAssets, this.terrain);
       this.assetsDirty = false;

@@ -6,11 +6,21 @@
 import * as THREE from 'three';
 import { clamp } from './math';
 import { colorForBiome } from '../oathbound/palette';
-import { pavedSurfaceGeometry, cubicTerrainGeometry } from '../format/map';
+import { pavedSurfaceGeometry, PAVED_GROUND } from '../format/map';
 import { makePavingTexture } from './paving';
 
 /** Sculpt brush footprint + edge profile. Hard-edged shapes build vertical cliffs. */
 export type BrushShape = 'circle' | 'square' | 'pillar' | 'mesa';
+
+/** Fixed voxel cube size (m) — matches the game's `VOXEL_CUBE` so the Cube-World preview reads
+ *  1:1 with what the player sees. The whole (huge) map can't be voxelised at this size, so the
+ *  preview draws a fine-cube *bubble* around the camera focus (same as the game's player bubble)
+ *  and rebuilds it as you pan — instead of one coarse whole-map mesh with giant cubes. */
+const VOXEL_CUBE = 3;
+/** How far (m) the paving texture repeats — one stone tile per 2.2 m (world-scaled, seamless). */
+const PAVE_REPEAT = 1 / 2.2;
+/** Sit paving just above the cube top to beat z-fighting. */
+const PAVE_LIFT = 0.06;
 
 // Shared paving material (city / cobblestone overlay). Lazy so tests without a DOM are fine.
 let _pavingMat: THREE.Material | null = null;
@@ -38,10 +48,16 @@ export class EditorTerrain {
   readonly group: THREE.Group;
   /** Voxel / "Cube World" terrain, shown instead of the smooth mesh when `voxel` is on. */
   private readonly voxelMesh: THREE.Mesh;
+  /** Per-cube paved-stone overlay for voxel mode (one textured quad per paved cube top). */
+  private readonly voxelPaving: THREE.Mesh;
   /** Render the terrain as stepped cubes (Cube World look). Visual only — export is unchanged. */
   voxel = false;
   /** Vertical quantization (m) for the voxel terrain (matches the game's default). */
   voxelStep = 2;
+  /** Centre + radius (m) of the currently-built cube bubble, so we only rebuild when it drifts. */
+  private vcx = Infinity;
+  private vcz = Infinity;
+  private vr = 260;
   /** Paved-ground (City/Cobblestone) texture overlay, a child of the terrain mesh. */
   private readonly paving: THREE.Mesh;
   private readonly geo: THREE.BufferGeometry;
@@ -78,36 +94,120 @@ export class EditorTerrain {
     this.voxelMesh.name = 'terrain-voxel';
     this.voxelMesh.frustumCulled = false;
     this.voxelMesh.visible = false;
+    // Per-cube paving overlay (voxel mode) — the stone texture laid on paved cube tops.
+    this.voxelPaving = new THREE.Mesh(new THREE.BufferGeometry(), pavingMaterial());
+    this.voxelPaving.name = 'terrain-voxel-paving';
+    this.voxelPaving.frustumCulled = false;
+    this.voxelPaving.visible = false;
     this.group = new THREE.Group();
     this.group.name = 'terrain-group';
     this.group.add(this.mesh);
     this.group.add(this.voxelMesh);
+    this.group.add(this.voxelPaving);
     this.group.add(this.paving);
 
     this.rebuildXZ();
     this.refresh();
   }
 
-  /** Rebuild the voxel/Cube-World terrain from the current heights + ground. */
-  private rebuildVoxel(): void {
-    // Cap the cube count for perf on huge maps; finer than the game's near-field is impractical
-    // to draw whole-map, so big maps (e.g. Talar) preview a little coarser than they look in-game.
-    const cells = Math.min(this.res - 1, 400);
+  /** Rebuild the cube bubble if the focus point has drifted or the radius changed. Called each
+   *  frame with the camera's orbit target + a view-scaled radius. Cheap no-op while it's stable. */
+  updateVoxel(cx: number, cz: number, radius: number): void {
+    if (!this.voxel) return;
+    const moved = Math.abs(cx - this.vcx) + Math.abs(cz - this.vcz);
+    if (moved < Math.max(VOXEL_CUBE, this.vr * 0.25) && radius === this.vr) return;
+    this.vr = radius;
+    this.rebuildVoxelBubble(cx, cz, radius);
+  }
+
+  /** Build a bubble of fixed-size (VOXEL_CUBE) cubes around (cx, cz), clipped to the map, plus a
+   *  per-cube paved-stone overlay — mirroring the game's `VoxelTerrain` so the preview reads 1:1.
+   *  Cube tops sit at the height quantised to `voxelStep`; side walls drop to lower neighbours. */
+  private rebuildVoxelBubble(cx: number, cz: number, radius: number): void {
+    const cube = VOXEL_CUBE, step = this.voxelStep, sideDarken = 0.7, half = this.half;
+    this.vcx = cx; this.vcz = cz;
+    const i0 = Math.floor((cx - radius) / cube), i1 = Math.ceil((cx + radius) / cube);
+    const j0 = Math.floor((cz - radius) / cube), j1 = Math.ceil((cz + radius) / cube);
+    const nx = i1 - i0 + 1, nz = j1 - j0 + 1;
     const c = new THREE.Color();
-    const { positions, normals, colors, indices } = cubicTerrainGeometry(
-      this.size, cells, this.voxelStep,
-      (x, z) => this.heightAt(x, z),
-      (x, z, h, out) => {
-        colorForBiome(this.biomeAt(x, z), h, x, z, c);
-        out[0] = c.r; out[1] = c.g; out[2] = c.b;
-      },
-    );
+
+    // Height / colour / biome per cube on the fixed world grid (cube centre = (i+0.5)·cube).
+    const H = new Float32Array(nx * nz);
+    const CR = new Float32Array(nx * nz), CG = new Float32Array(nx * nz), CB = new Float32Array(nx * nz);
+    const BIO = new Uint8Array(nx * nz);
+    const IB = new Uint8Array(nx * nz); // 1 = cube centre lies inside the authored map
+    for (let jz = 0; jz < nz; jz++) {
+      for (let ix = 0; ix < nx; ix++) {
+        const wx = (i0 + ix + 0.5) * cube, wz = (j0 + jz + 0.5) * cube;
+        const k = jz * nx + ix;
+        const raw = this.heightAt(wx, wz);
+        H[k] = step > 0 ? Math.round(raw / step) * step : raw;
+        const bio = this.biomeAt(wx, wz);
+        BIO[k] = bio;
+        IB[k] = wx >= -half && wx <= half && wz >= -half && wz <= half ? 1 : 0;
+        colorForBiome(bio, H[k], wx, wz, c);
+        CR[k] = c.r; CG[k] = c.g; CB[k] = c.b;
+      }
+    }
+
+    const pos: number[] = [], nrm: number[] = [], col: number[] = [], idx: number[] = [];
+    const quad = (
+      ax: number, ay: number, az: number, bx: number, by: number, bz: number,
+      cxx: number, cyy: number, czz: number, dx: number, dy: number, dz: number,
+      nx2: number, ny2: number, nz2: number, r: number, g: number, b: number,
+    ): void => {
+      const base = pos.length / 3;
+      pos.push(ax, ay, az, bx, by, bz, cxx, cyy, czz, dx, dy, dz);
+      for (let i = 0; i < 4; i++) { nrm.push(nx2, ny2, nz2); col.push(r, g, b); }
+      idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    };
+    // Neighbour top (only draw a wall to a lower in-map neighbour; map-edge cubes get no skirt).
+    const wall = (k: number, nk: number): boolean => nk >= 0 && nk < nx * nz && IB[nk] === 1 && H[k] > H[nk];
+    const ppos: number[] = [], puv: number[] = [], pcol: number[] = [], pidx: number[] = [];
+
+    for (let jz = 0; jz < nz; jz++) {
+      for (let ix = 0; ix < nx; ix++) {
+        const k = jz * nx + ix;
+        if (!IB[k]) continue; // clip the bubble to the authored map
+        const y = H[k];
+        const x0 = (i0 + ix) * cube, x1 = x0 + cube;
+        const z0 = (j0 + jz) * cube, z1 = z0 + cube;
+        const r = CR[k], g = CG[k], b = CB[k];
+        const dr = r * sideDarken, dg = g * sideDarken, db = b * sideDarken;
+        quad(x0, y, z0, x0, y, z1, x1, y, z1, x1, y, z0, 0, 1, 0, r, g, b); // flat top
+        if (ix + 1 < nx && wall(k, k + 1)) quad(x1, y, z0, x1, y, z1, x1, H[k + 1], z1, x1, H[k + 1], z0, 1, 0, 0, dr, dg, db);
+        if (ix - 1 >= 0 && wall(k, k - 1)) quad(x0, y, z1, x0, y, z0, x0, H[k - 1], z0, x0, H[k - 1], z1, -1, 0, 0, dr, dg, db);
+        if (jz + 1 < nz && wall(k, k + nx)) quad(x1, y, z1, x0, y, z1, x0, H[k + nx], z1, x1, H[k + nx], z1, 0, 0, 1, dr, dg, db);
+        if (jz - 1 >= 0 && wall(k, k - nx)) quad(x0, y, z0, x1, y, z0, x1, H[k - nx], z0, x0, H[k - nx], z0, 0, 0, -1, dr, dg, db);
+
+        // Paved cube top → a flat, stone-textured quad just above it (world-UV so stones tile).
+        if (PAVED_GROUND.has(BIO[k])) {
+          const py = y + PAVE_LIFT, warm = BIO[k] === 15; // cobblestone warmer than city grey
+          const pr = warm ? 0.74 : 0.68, pg = 0.68, pb = warm ? 0.58 : 0.71;
+          const pb0 = ppos.length / 3;
+          ppos.push(x0, py, z0, x0, py, z1, x1, py, z1, x1, py, z0);
+          puv.push(x0 * PAVE_REPEAT, z0 * PAVE_REPEAT, x0 * PAVE_REPEAT, z1 * PAVE_REPEAT, x1 * PAVE_REPEAT, z1 * PAVE_REPEAT, x1 * PAVE_REPEAT, z0 * PAVE_REPEAT);
+          for (let i = 0; i < 4; i++) { pcol.push(pr, pg, pb); }
+          pidx.push(pb0, pb0 + 1, pb0 + 2, pb0, pb0 + 2, pb0 + 3);
+        }
+      }
+    }
+
     const g = this.voxelMesh.geometry;
-    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    g.setIndex(new THREE.BufferAttribute(indices, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(pos), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(Float32Array.from(nrm), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(Float32Array.from(col), 3));
+    g.setIndex(new THREE.BufferAttribute(Uint32Array.from(idx), 1));
     g.computeBoundingSphere();
+
+    const pg = this.voxelPaving.geometry;
+    pg.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(ppos), 3));
+    pg.setAttribute('uv', new THREE.BufferAttribute(Float32Array.from(puv), 2));
+    pg.setAttribute('color', new THREE.BufferAttribute(Float32Array.from(pcol), 3));
+    pg.setIndex(new THREE.BufferAttribute(Uint32Array.from(pidx), 1));
+    pg.computeVertexNormals();
+    pg.computeBoundingSphere();
+    this.voxelPaving.visible = this.voxel && ppos.length > 0;
   }
 
   /** Toggle stepped-cube (Cube World) terrain rendering. */
@@ -120,7 +220,7 @@ export class EditorTerrain {
   /** Set the voxel vertical step (m) and rebuild if voxel terrain is showing. */
   setVoxelStep(step: number): void {
     this.voxelStep = step;
-    if (this.voxel) this.rebuildVoxel();
+    if (this.voxel) this.rebuildVoxelBubble(this.vcx === Infinity ? 0 : this.vcx, this.vcz === Infinity ? 0 : this.vcz, this.vr);
   }
 
   /** Rebuild the City/Cobblestone paving overlay from the current ground + heights. */
@@ -218,7 +318,12 @@ export class EditorTerrain {
     // Smooth mesh stays raycastable (tools pick against it) but is hidden in voxel mode.
     this.mesh.visible = !this.voxel;
     this.voxelMesh.visible = this.voxel;
-    if (this.voxel) this.rebuildVoxel();
+    // In voxel mode the per-cube overlay replaces the smooth-surface paving.
+    if (this.voxel) this.paving.visible = false;
+    else this.voxelPaving.visible = false;
+    if (this.voxel) {
+      this.rebuildVoxelBubble(this.vcx === Infinity ? 0 : this.vcx, this.vcz === Infinity ? 0 : this.vcz, this.vr);
+    }
     this.dirty = false;
   }
 
@@ -349,5 +454,6 @@ export class EditorTerrain {
     this.paving.geometry.dispose(); // shared material is reused across terrains
     this.voxelMesh.geometry.dispose();
     (this.voxelMesh.material as THREE.Material).dispose();
+    this.voxelPaving.geometry.dispose(); // shared paving material reused across terrains
   }
 }
