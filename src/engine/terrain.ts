@@ -5,9 +5,9 @@
 
 import * as THREE from 'three';
 import { clamp } from './math';
-import { colorForBiome } from '../oathbound/palette';
-import { pavedSurfaceGeometry, PAVED_GROUND } from '../format/map';
-import { makePavingTexture } from './paving';
+import { colorForBiome, groundMaterial, type GroundMaterial } from '../oathbound/palette';
+import { pavedSurfaceGeometry } from '../format/map';
+import { makePavingTexture, makeGroundTexture } from './paving';
 
 /** Sculpt brush footprint + edge profile. Hard-edged shapes build vertical cliffs. */
 export type BrushShape = 'circle' | 'square' | 'pillar' | 'mesa';
@@ -17,12 +17,16 @@ export type BrushShape = 'circle' | 'square' | 'pillar' | 'mesa';
  *  preview draws a fine-cube *bubble* around the camera focus (same as the game's player bubble)
  *  and rebuilds it as you pan — instead of one coarse whole-map mesh with giant cubes. */
 const VOXEL_CUBE = 3;
-/** How far (m) the paving texture repeats — one stone tile per 2.2 m (world-scaled, seamless). */
-const PAVE_REPEAT = 1 / 2.2;
-/** Sit paving just above the cube top to beat z-fighting. */
-const PAVE_LIFT = 0.06;
+/** Lift a detail overlay just above the cube top to beat z-fighting. */
+const GROUND_LIFT = 0.06;
+/** World tile size (repeats/m) per material — a smaller number ⇒ bigger stones/blades on the ground. */
+const GROUND_TILE: Record<GroundMaterial, number> = { grass: 1 / 2.4, rock: 1 / 2.8, grit: 1 / 1.8, paved: 1 / 2.2 };
+/** Tint boost per material so (light detail texture × biome tint) averages back near the base colour. */
+const GROUND_BOOST: Record<GroundMaterial, number> = { grass: 1.34, rock: 1.24, grit: 1.2, paved: 1 };
+/** All ground materials, in a stable order for overlay iteration. */
+const GROUND_MATERIALS: GroundMaterial[] = ['grass', 'rock', 'grit', 'paved'];
 
-// Shared paving material (city / cobblestone overlay). Lazy so tests without a DOM are fine.
+// Shared paving material for the SMOOTH-mode overlay. Lazy so tests without a DOM are fine.
 let _pavingMat: THREE.Material | null = null;
 function pavingMaterial(): THREE.Material {
   if (!_pavingMat) {
@@ -32,6 +36,23 @@ function pavingMaterial(): THREE.Material {
     });
   }
   return _pavingMat;
+}
+
+// One detail-texture material per ground material, for the voxel cube-top overlays. Lazy (DOM).
+let _groundMats: Record<GroundMaterial, THREE.Material> | null = null;
+function groundMaterials(): Record<GroundMaterial, THREE.Material> {
+  if (!_groundMats) {
+    const mk = (map: THREE.Texture): THREE.Material => new THREE.MeshLambertMaterial({
+      map, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
+    _groundMats = {
+      grass: mk(makeGroundTexture('grass')),
+      rock: mk(makeGroundTexture('rock')),
+      grit: mk(makeGroundTexture('grit')),
+      paved: mk(makePavingTexture()),
+    };
+  }
+  return _groundMats;
 }
 
 export class EditorTerrain {
@@ -48,8 +69,9 @@ export class EditorTerrain {
   readonly group: THREE.Group;
   /** Voxel / "Cube World" terrain, shown instead of the smooth mesh when `voxel` is on. */
   private readonly voxelMesh: THREE.Mesh;
-  /** Per-cube paved-stone overlay for voxel mode (one textured quad per paved cube top). */
-  private readonly voxelPaving: THREE.Mesh;
+  /** Per-material detail overlays for voxel mode — one textured quad per cube top, keyed by the
+   *  cube's ground material (grass/rock/grit/paved), so each cube reads as its surface. */
+  private readonly voxelOverlays: Record<GroundMaterial, THREE.Mesh>;
   /** Render the terrain as stepped cubes (Cube World look). Visual only — export is unchanged. */
   voxel = false;
   /** Vertical quantization (m) for the voxel terrain (matches the game's default). */
@@ -94,16 +116,25 @@ export class EditorTerrain {
     this.voxelMesh.name = 'terrain-voxel';
     this.voxelMesh.frustumCulled = false;
     this.voxelMesh.visible = false;
-    // Per-cube paving overlay (voxel mode) — the stone texture laid on paved cube tops.
-    this.voxelPaving = new THREE.Mesh(new THREE.BufferGeometry(), pavingMaterial());
-    this.voxelPaving.name = 'terrain-voxel-paving';
-    this.voxelPaving.frustumCulled = false;
-    this.voxelPaving.visible = false;
+    // Per-material detail overlays (voxel mode) — a textured quad on each cube top.
+    const gm = groundMaterials();
+    this.voxelOverlays = {
+      grass: new THREE.Mesh(new THREE.BufferGeometry(), gm.grass),
+      rock: new THREE.Mesh(new THREE.BufferGeometry(), gm.rock),
+      grit: new THREE.Mesh(new THREE.BufferGeometry(), gm.grit),
+      paved: new THREE.Mesh(new THREE.BufferGeometry(), gm.paved),
+    };
     this.group = new THREE.Group();
     this.group.name = 'terrain-group';
     this.group.add(this.mesh);
     this.group.add(this.voxelMesh);
-    this.group.add(this.voxelPaving);
+    for (const mat of GROUND_MATERIALS) {
+      const m = this.voxelOverlays[mat];
+      m.name = `terrain-voxel-${mat}`;
+      m.frustumCulled = false;
+      m.visible = false;
+      this.group.add(m);
+    }
     this.group.add(this.paving);
 
     this.rebuildXZ();
@@ -163,7 +194,11 @@ export class EditorTerrain {
     };
     // Neighbour top (only draw a wall to a lower in-map neighbour; map-edge cubes get no skirt).
     const wall = (k: number, nk: number): boolean => nk >= 0 && nk < nx * nz && IB[nk] === 1 && H[k] > H[nk];
-    const ppos: number[] = [], puv: number[] = [], pcol: number[] = [], pidx: number[] = [];
+    // Per-material overlay buckets: a textured, biome-tinted quad on every cube top.
+    const OV: Record<GroundMaterial, { pos: number[]; uv: number[]; col: number[]; idx: number[] }> = {
+      grass: { pos: [], uv: [], col: [], idx: [] }, rock: { pos: [], uv: [], col: [], idx: [] },
+      grit: { pos: [], uv: [], col: [], idx: [] }, paved: { pos: [], uv: [], col: [], idx: [] },
+    };
 
     for (let jz = 0; jz < nz; jz++) {
       for (let ix = 0; ix < nx; ix++) {
@@ -180,16 +215,18 @@ export class EditorTerrain {
         if (jz + 1 < nz && wall(k, k + nx)) quad(x1, y, z1, x0, y, z1, x0, H[k + nx], z1, x1, H[k + nx], z1, 0, 0, 1, dr, dg, db);
         if (jz - 1 >= 0 && wall(k, k - nx)) quad(x0, y, z0, x1, y, z0, x1, H[k - nx], z0, x0, H[k - nx], z0, 0, 0, -1, dr, dg, db);
 
-        // Paved cube top → a flat, stone-textured quad just above it (world-UV so stones tile).
-        if (PAVED_GROUND.has(BIO[k])) {
-          const py = y + PAVE_LIFT, warm = BIO[k] === 15; // cobblestone warmer than city grey
-          const pr = warm ? 0.74 : 0.68, pg = 0.68, pb = warm ? 0.58 : 0.71;
-          const pb0 = ppos.length / 3;
-          ppos.push(x0, py, z0, x0, py, z1, x1, py, z1, x1, py, z0);
-          puv.push(x0 * PAVE_REPEAT, z0 * PAVE_REPEAT, x0 * PAVE_REPEAT, z1 * PAVE_REPEAT, x1 * PAVE_REPEAT, z1 * PAVE_REPEAT, x1 * PAVE_REPEAT, z0 * PAVE_REPEAT);
-          for (let i = 0; i < 4; i++) { pcol.push(pr, pg, pb); }
-          pidx.push(pb0, pb0 + 1, pb0 + 2, pb0, pb0 + 2, pb0 + 3);
-        }
+        // Detail overlay on the cube top: pick the material's texture, tint by the biome colour
+        // (paving keeps its own brighter grey/warm tint), world-UV so the grain tiles seamlessly.
+        const mat = groundMaterial(BIO[k]);
+        const tile = GROUND_TILE[mat], py = y + GROUND_LIFT;
+        let tr: number, tg: number, tb: number;
+        if (mat === 'paved') { const warm = BIO[k] === 15; tr = warm ? 0.74 : 0.68; tg = 0.68; tb = warm ? 0.58 : 0.71; }
+        else { const bo = GROUND_BOOST[mat]; tr = Math.min(1, r * bo); tg = Math.min(1, g * bo); tb = Math.min(1, b * bo); }
+        const o = OV[mat], ob = o.pos.length / 3;
+        o.pos.push(x0, py, z0, x0, py, z1, x1, py, z1, x1, py, z0);
+        o.uv.push(x0 * tile, z0 * tile, x0 * tile, z1 * tile, x1 * tile, z1 * tile, x1 * tile, z0 * tile);
+        for (let i = 0; i < 4; i++) o.col.push(tr, tg, tb);
+        o.idx.push(ob, ob + 1, ob + 2, ob, ob + 2, ob + 3);
       }
     }
 
@@ -200,14 +237,16 @@ export class EditorTerrain {
     g.setIndex(new THREE.BufferAttribute(Uint32Array.from(idx), 1));
     g.computeBoundingSphere();
 
-    const pg = this.voxelPaving.geometry;
-    pg.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(ppos), 3));
-    pg.setAttribute('uv', new THREE.BufferAttribute(Float32Array.from(puv), 2));
-    pg.setAttribute('color', new THREE.BufferAttribute(Float32Array.from(pcol), 3));
-    pg.setIndex(new THREE.BufferAttribute(Uint32Array.from(pidx), 1));
-    pg.computeVertexNormals();
-    pg.computeBoundingSphere();
-    this.voxelPaving.visible = this.voxel && ppos.length > 0;
+    for (const mat of GROUND_MATERIALS) {
+      const o = OV[mat], mesh = this.voxelOverlays[mat], geo = mesh.geometry;
+      geo.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(o.pos), 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(Float32Array.from(o.uv), 2));
+      geo.setAttribute('color', new THREE.BufferAttribute(Float32Array.from(o.col), 3));
+      geo.setIndex(new THREE.BufferAttribute(Uint32Array.from(o.idx), 1));
+      geo.computeVertexNormals();
+      geo.computeBoundingSphere();
+      mesh.visible = this.voxel && o.pos.length > 0;
+    }
   }
 
   /** Toggle stepped-cube (Cube World) terrain rendering. */
@@ -318,9 +357,9 @@ export class EditorTerrain {
     // Smooth mesh stays raycastable (tools pick against it) but is hidden in voxel mode.
     this.mesh.visible = !this.voxel;
     this.voxelMesh.visible = this.voxel;
-    // In voxel mode the per-cube overlay replaces the smooth-surface paving.
+    // In voxel mode the per-cube detail overlays replace the smooth-surface paving.
     if (this.voxel) this.paving.visible = false;
-    else this.voxelPaving.visible = false;
+    else for (const mat of GROUND_MATERIALS) this.voxelOverlays[mat].visible = false;
     if (this.voxel) {
       this.rebuildVoxelBubble(this.vcx === Infinity ? 0 : this.vcx, this.vcz === Infinity ? 0 : this.vcz, this.vr);
     }
@@ -454,6 +493,6 @@ export class EditorTerrain {
     this.paving.geometry.dispose(); // shared material is reused across terrains
     this.voxelMesh.geometry.dispose();
     (this.voxelMesh.material as THREE.Material).dispose();
-    this.voxelPaving.geometry.dispose(); // shared paving material reused across terrains
+    for (const mat of GROUND_MATERIALS) this.voxelOverlays[mat].geometry.dispose(); // shared materials reused
   }
 }
