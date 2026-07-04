@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { EditorTerrain } from './terrain';
 import { hasWater, waterSurfaceGeometry, type MapLake, type MapPath } from '../format/map';
 import { buildRibbon } from './ribbon';
+import { roadMaterial } from './paving';
 
 const lakeMat = new THREE.MeshStandardMaterial({
   color: 0x356f96,
@@ -25,14 +26,6 @@ const riverMat = new THREE.MeshStandardMaterial({
   polygonOffsetFactor: -2,
   polygonOffsetUnits: -2,
 });
-const roadMat = new THREE.MeshLambertMaterial({
-  color: 0x9c8a5e,
-  side: THREE.DoubleSide,
-  polygonOffset: true,
-  polygonOffsetFactor: -3,
-  polygonOffsetUnits: -3,
-});
-
 /** Default water-surface height for a lake placed at (x,z) on the current terrain. */
 export function defaultLakeY(terrain: EditorTerrain, x: number, z: number): number {
   return terrain.heightAt(x, z) + 0.15;
@@ -94,7 +87,7 @@ export class WaterRoadLayer {
       }
     }
     for (let i = 0; i < roads.length; i++) {
-      const m = buildRibbon(roads[i], terrain, 0.25, roadMat, `road-${i}`);
+      const m = buildRibbon(roads[i], terrain, 0.25, roadMaterial(roads[i].style ?? 'city'), `road-${i}`);
       if (m) {
         this.group.add(m);
         this.meshes.push(m);

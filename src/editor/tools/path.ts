@@ -5,13 +5,15 @@
 import * as THREE from 'three';
 import type { Tool } from '../tool';
 import type { Editor } from '../editor';
-import type { MapPath } from '../../format/map';
-import { el, section, slider } from '../ui/dom';
+import type { MapPath, RoadStyle } from '../../format/map';
+import { el, section, select, slider } from '../ui/dom';
 
 class PathTool implements Tool {
   readonly dragPaints = false;
   readonly icon: string;
   width: number;
+  /** Road surface texture (roads only; rivers ignore it). */
+  style: RoadStyle = 'city';
 
   private points: { x: number; z: number }[] = [];
   private down: { x: number; y: number } | null = null;
@@ -87,6 +89,7 @@ class PathTool implements Tool {
       return;
     }
     const path: MapPath = { points: this.points.slice(), width: this.width };
+    if (this.id === 'road') path.style = this.style;
     const arr = this.id === 'river' ? editor.state.rivers : editor.state.roads;
     editor.addItems(arr, [path], `Add ${this.label.toLowerCase()}`, () => editor.markWaterDirty());
     editor.setStatus(`${this.label} placed (${path.points.length} points)`);
@@ -137,10 +140,17 @@ class PathTool implements Tool {
       onInput: (v) => (this.width = v),
       format: (v) => `${v.toFixed(1)}m`,
     });
-    return section(this.label, [
-      widthRow.row,
-      el('p', { class: 'hint', text: 'Click to add points · double-click or Enter to finish · Esc to cancel · drag to orbit.' }),
-    ]);
+    const rows: HTMLElement[] = [widthRow.row];
+    if (this.id === 'road') {
+      // Environmental road surface — laid on the road ribbon here and in-game.
+      rows.push(select('Surface', [
+        { value: 'city', label: 'City road — cobbled stone' },
+        { value: 'grass', label: 'Grassland road — packed dirt' },
+        { value: 'sand', label: 'Sandland road — desert sand' },
+      ], this.style, (v) => (this.style = v as RoadStyle)));
+    }
+    rows.push(el('p', { class: 'hint', text: 'Click to add points · double-click or Enter to finish · Esc to cancel · drag to orbit.' }));
+    return section(this.label, rows);
   }
 }
 
